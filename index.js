@@ -75,17 +75,17 @@ async function agenteSQLDataHunter(mensagem, termoLimpo, intent, historico = [])
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
         let regra = "";
-        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha alvo na mensagem ou no CONTEXTO. EXCLUA palavras como 'linha', 'modelo', 'luminária'. Crie um SELECT básico usando: WHERE produtos ILIKE '%seu_termo_isolado%' OR linha ILIKE '%seu_termo_isolado%'`;
-        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave e ISOLADO do pedido e crie um SELECT usando: WHERE produtos ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
-        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Crie um SELECT usando: WHERE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' OR usabilidade_principal ILIKE '%seu_termo%'`;
+        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique APENAS O NOME CURTO DA LINHA ou o CÓDIGO EXATO (Ex: Flat, 5103) na mensagem ou no CONTEXTO. NUNCA INSIRA FRASES NO ILIKE. Crie o SELECT usando: WHERE produtos ILIKE '%NOME_AQUI%' OR linha ILIKE '%NOME_AQUI%'`;
+        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Use APENAS a principal palavra-chave isolada. Crie o SELECT usando: WHERE produtos ILIKE '%PALAVRA%' OR descricao ILIKE '%PALAVRA%'`;
+        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Identifique a tipologia desejada (ex: balizador, embutido). Crie o SELECT usando: WHERE linha ILIKE '%TIPO%' OR tipologia ILIKE '%TIPO%' OR usabilidade_principal ILIKE '%TIPO%'`;
 
-        const promptSQL = `Você é um robô gerador de SQL PostgreSQL focado em criar filtros precisos. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais, finais ou marcação de código markdown.
+        const promptSQL = `Você é um robô gerador de SQL PostgreSQL focado em criar filtros exatos. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT. Sem aspas iniciais, finais ou código markdown.
         Base de Colunas Válidas: ${TABLE_SCHEMA} 
-        Regra de Busca Estratégica: ${regra}
+        Regra de Busca: ${regra}
         Contexto da Conversa: ${JSON.stringify(historico.slice(-4))}
-        Mensagem Original do Cliente: "${mensagem}"
-        Termo Sugerido Limpo pela Regex: "${termoLimpo}" (Use este termo preferencialmente para o ILIKE)
-        Retorne as colunas: produtos, linha, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao. Não aplique LIMIT, traga todos os resultados.`;
+        Mensagem do Cliente: "${mensagem}"
+        [REGRA DE OURO]: O termo dentro de ILIKE '%%' DEVE SER APENAS 1 OU 2 PALAVRAS (O nome da linha ou código). SE VOCÊ INSERIR A FRASE INTEIRA DO CLIENTE DENTRO DO ILIKE, O BANCO VAI RETORNAR 0.
+        Retorne as colunas: produtos, linha, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao. Aplique LIMIT 40 para não sobrecarregar o chat.`;
 
         const sqlCompletion = await openai.chat.completions.create({
             model: "gpt-4o",
