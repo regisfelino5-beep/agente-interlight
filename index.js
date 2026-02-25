@@ -45,9 +45,9 @@ const TABLE_SCHEMA = `Colunas Principais: referencia_completa, linha, tipologia,
 async function agenteRoteador(mensagem) {
     console.log("🧭 [Agente Roteador] Classificando intenção...");
     const prompt = `Classifique a intenção do cliente da Interlight rigorosamente: 
-- "produto_exato": Contém códigos ou referências diretas como "2153.S.PM" ou "5103" ou nomes puros de linhas.
+- "produto_exato": Contém estritamente códigos ou referências diretas do catálogo (ex: "2153.S.PM", "5103").
 - "produto_consultivo": Busca por aplicação em um projeto (ex: "preciso de uma luminária de piso externa").
-- "conceito_tecnico": Pergunta pura sobre teoria, normas, IP67, IK, STP, como as linhas funcionam. 
+- "conceito_tecnico": Pergunta sobre teoria, normas, IP67, IK, ou DETALHES DE UMA LINHA DE PRODUTOS (ex: "características da linha flat", "como funciona a linha orion"). 
 
 Responda OBRIGATORIAMENTE JSON: { "intent": "produto_exato" ou "produto_consultivo" ou "conceito_tecnico" }`;
 
@@ -73,9 +73,9 @@ async function agenteSQLDataHunter(mensagem, termoLimpo, intent) {
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
         let regra = "";
-        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha (Ex: Flat, 5103, 2153.S.PM) na mensagem do cliente. Crie um SELECT básico usando: WHERE referencia_completa ILIKE '%seu_termo%' OR linha ILIKE '%seu_termo%'`;
-        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave do pedido e crie um SELECT usando: WHERE referencia_completa ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
-        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Identifique a necessidade e o tipo de luminária e crie um SELECT usando: WHERE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' OR usabilidade_principal ILIKE '%seu_termo%'`;
+        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha (Ex: Flat, 5103, 2153.S.PM) na mensagem do cliente. EXCLUA palavras como 'linha', 'modelo', 'luminária'. Crie um SELECT básico usando: WHERE referencia_completa ILIKE '%seu_termo_isolado%' OR linha ILIKE '%seu_termo_isolado%'`;
+        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave e ISOLADO do pedido e crie um SELECT usando: WHERE referencia_completa ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
+        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Crie um SELECT usando: WHERE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' OR usabilidade_principal ILIKE '%seu_termo%'`;
 
         const promptSQL = `Você é um robô gerador de SQL PostgreSQL. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais, finais ou marcação de código markdown.
         Base de Colunas Válidas: ${TABLE_SCHEMA} 
