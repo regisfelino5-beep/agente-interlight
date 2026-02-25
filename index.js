@@ -4,39 +4,23 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const { OpenAI } = require('openai');
 const fs = require('fs');
-
+// Carrega o manual inteiro na memória RAM do servidor
 const manualTecnico = fs.readFileSync('manual_interlight.txt.txt', 'utf8');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configuração do OpenAI
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Configuração do Supabase
-const pool = new Pool({
-    connectionString: process.env.SUPABASE_DATABASE_URL,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const pool = new Pool({ connectionString: process.env.SUPABASE_DATABASE_URL });
 
 // ==========================================
-// ESTADO PERSISTENTE (MEMÓRIA DE SESSÃO)
+// ESTADO PERSISTENTE (MEMÓRIA)
 // ==========================================
 const sessions = {};
-
 function getSession(id) {
     if (!sessions[id]) {
-        sessions[id] = {
-            history: [],
-            context: {
-                linha: null,
-                tipologia: null,
-                ambiente: null,
-                cor: null
-            }
-        };
+        sessions[id] = { history: [], context: {} };
     }
     return sessions[id];
 }
@@ -44,338 +28,189 @@ function getSession(id) {
 // ==========================================
 // UTILITÁRIOS - SANITIZAÇÃO RADICAL
 // ==========================================
-/**
- * Extrai puramente os códigos de referência, removendo verbosidades (ex: 'Modelo', 'Ref:', 'Peça').
- * Preserva hífens e pontos comuns em códigos da Interlight (ex: "2153.S.PM", "3345-S").
- */
 function extrairCodigoBusca(mensagem) {
-    let termoLimpo = mensagem;
-    // Remove palavras-chave inúteis para a busca exata
+    let termo = mensagem;
     const lixo = [/modelo/ig, /referação/ig, /referencia/ig, /ref:/ig, /ref/ig, /peça/ig, /codigo/ig, /código/ig, /luminária/ig, /luminaria/ig];
-    lixo.forEach(regex => { termoLimpo = termoLimpo.replace(regex, '') });
-
-    // Deixa apenas letras, números, hífens, pontos e espaços
-    termoLimpo = termoLimpo.replace(/[^a-zA-Z0-9.\-\s]/g, '').trim();
-
-    return termoLimpo;
+    lixo.forEach(regex => { termo = termo.replace(regex, '') });
+    // Mantém letras, números, pontos e hífens. Ex: 2153.S.PM
+    return termo.replace(/[^a-zA-Z0-9.\-]/g, '').trim();
 }
 
-// ==========================================
-// GLOSSÁRIO INTERNO & SCHEMA
-// ==========================================
-const GLOSSARIO = `
-GLOSSÁRIO TÉCNICO E DE BUSCA:
-- PM = Preto Microtexturizado
-- BR = Branco
-- MT = Misto / Metalizado
-`;
-
-const TABLE_SCHEMA = `
-Tabela "public"."interlight_catalog_raw"
-Colunas Principais: referencia_completa, linha, tipologia, sub_tipologia, descricao, usabilidade_principal, cores, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao, irc_ra_r1_r8, ies, manual
-`;
+const GLOSSARIO = `SIGLAS: PM=Preto Microtexturizado, BR=Branco, MT=Metalizado.`;
+const TABLE_SCHEMA = `Colunas Principais: referencia_completa, linha, tipologia, sub_tipologia, descricao, cores, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao, irc_ra_r1_r8, ies, manual`;
 
 // ==========================================
-// AGENTES DA ORQUESTRAÇÃO - CONSULTOR ESPECIALISTA
+// 1. AGENTE ROTEADOR
 // ==========================================
+async function agenteRoteador(mensagem) {
+    console.log("🧭 [Agente Roteador] Classificando intenção...");
+    const prompt = `Classifique a intenção do cliente da Interlight rigorosamente: 
+- "produto_exato": Contém códigos ou referências diretas como "2153.S.PM" ou "5103" ou nomes puros de linhas.
+- "produto_consultivo": Busca por aplicação em um projeto (ex: "preciso de uma luminária de piso externa").
+- "conceito_tecnico": Pergunta pura sobre teoria, normas, IP67, IK, STP, como as linhas funcionam. 
 
-/**
- * 1. AGENTE ROTEADOR
- * Define se a intenção é busca de código direto, consultoria técnica ou teoria vazia.
- */
-async function agenteRoteador(mensagem, sessionContext) {
-    console.log("🧭 [Agente Roteador] Classificando perfil de consultoria...");
-    const prompt = `
-Você é o Agente Roteador da Interlight.
-Classifique a intenção do usuário:
-- "produto_direto": O cliente fornece um código técnico ou referência (ex: "2153.S.PM", "preciso do modelo 5103").
-- "produto_consultivo": O cliente pede sugestões para resolver uma dor (ex: "luminária de piso externa").
-- "teoria": Quer saber teoria sobre luz ou ofuscamento.
+Responda OBRIGATORIAMENTE JSON: { "intent": "produto_exato" ou "produto_consultivo" ou "conceito_tecnico" }`;
 
-Contexto Anterior: ${JSON.stringify(sessionContext)}
-Nova Mensagem: "${mensagem}"
-
-Responda OBRIGATORIAMENTE em JSON:
-{
-  "intent": "produto_direto" ou "produto_consultivo" ou "teoria",
-  "novo_contexto": { "linha": "...", "cor": "..." }
-}
-`;
     const response = await openai.chat.completions.create({
         model: "gpt-4o",
         temperature: 0,
-        messages: [{ role: "system", content: prompt }],
+        messages: [{ role: "system", content: prompt }, { role: "user", content: mensagem }],
         response_format: { type: "json_object" }
     });
-    return JSON.parse(response.choices[0].message.content);
+    return JSON.parse(response.choices[0].message.content).intent;
 }
 
-/**
- * 2. CONSULTOR TÉCNICO
- * Prepara o payload para o SQL. Se for busca de código, ele manda caçar direto sem palestrinha.
- */
-async function agenteConsultor(mensagemOriginal, termoLimpo, contextoAcumulado, intent) {
-    console.log("🧙 [Consultor Técnico] Formatando parâmetros técnicos...");
-
-    if (intent === "produto_direto") {
-        return `Busca técnica EXATA ou PARCIAL pela referência/código limpo: "${termoLimpo}". Regra: Zero preâmbulo teórico, apenas extração de dados brutos.`;
-    }
-
-    const prompt = `
-Você é o Consultor Especialista em Iluminação da Interlight.
-Traduza o problema do cliente em parâmetros descritivos rigorosos para o banco.
-${GLOSSARIO}
-MANUAL: ${manualTecnico.substring(0, 1500)} // Resumo
-
-Cliente quer: "${mensagemOriginal}"
-Contexto: ${JSON.stringify(contextoAcumulado)}
-
-Retorne APENAS um texto descritivo técnico do que buscar no banco. 
-Ex: "Buscar luminárias de sobrepor, IP65, cor branca."
-`;
-    const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        temperature: 0.1,
-        messages: [{ role: "system", content: prompt }]
-    });
-    return response.choices[0].message.content.trim();
-}
-
-/**
- * 3. ESPECIALISTA SQL (Busca Híbrida 3 Níveis de Exatidão)
- */
-async function agenteSQLDataHunter(especificacoes) {
-    console.log(`🕵️ [Engenheiro de Dados] Iniciando rastreamento de 3 Níveis para: ${especificacoes}`);
-
-    let tentativa = 1;
+// ==========================================
+// 2. DATA HUNTER (SQL) - BUSCA EM 3 NÍVEIS
+// ==========================================
+async function agenteSQLDataHunter(mensagem, termoLimpo, intent) {
+    console.log(`🕵️ [Engenheiro de Dados SQL] Iniciando busca para intenção: ${intent} | termoLimpo: ${termoLimpo}`);
     let queryResult = [];
     let sqlGerado = "";
 
-    while (tentativa <= 3) {
-        let instrucaoNivel = "";
-        if (tentativa === 1) instrucaoNivel = "NÍVEL 1 (Exatidão Máxima): Crie a query priorizando a busca EXATA na coluna 'referencia_completa'. Use \`referencia_completa = 'termo'\` ou um ILIKE ultra restrito.";
-        if (tentativa === 2) instrucaoNivel = "NÍVEL 2 (Exatidão Parcial): Nível 1 falhou. Busque por fragmentos do código na coluna 'referencia_completa' usando ILIKE '%termo%'.";
-        if (tentativa === 3) instrucaoNivel = "NÍVEL 3 (Busca Consultiva): Nível 2 falhou. Procure amplamente nas colunas 'linha', 'tipologia', ou 'usabilidade_principal' usando palavras-chave extraídas da intenção do cliente.";
+    // Se for conceito técnico puro sem fornecer uma linha ou código, pula o banco
+    if (intent === "conceito_tecnico" && termoLimpo.length < 3) return { data: [], query: "N/A" };
 
-        const promptSQL = `
-Você é o Especialista de Dados da Interlight. Retorne APENAS o comando SELECT, sem \`\`\`sql. Nenhuma aspa extra!
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+        let regra = "";
+        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Crie SELECT ONDE referencia_completa ILIKE '${termoLimpo}%'`;
+        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Crie SELECT ONDE referencia_completa ILIKE '%${termoLimpo}%' ou descricao ILIKE '%${termoLimpo}%'`;
+        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Crie SELECT ONDE linha ILIKE '%${termoLimpo}%' OR tipologia ILIKE '%${termoLimpo}%' ou usabilidade_principal ILIKE '%${termoLimpo}%'`;
 
-Requisito Técnico: ${especificacoes}
-Estratégia de Busca: ${instrucaoNivel}
-
-${GLOSSARIO}
-${TABLE_SCHEMA}
-
-Regras Mandatórias:
-1. Retorne APENAS a query! 
-2. Colunas EXIGIDAS: referencia_completa, linha, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao, irc_ra_r1_r8, ies, manual, descricao, cores.
-3. LIMIT 6
-`;
+        const promptSQL = `Retorne APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais ou finais ou marcação markdown.
+        Base: ${TABLE_SCHEMA} | Glossário: ${GLOSSARIO}
+        Regra de Busca Estratégica: ${regra}
+        O Cliente pediu exatamente via Input do WhatsApp: ${mensagem}
+        Retorne pelo menos as colunas referencia_completa, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao
+        LIMIT 5`;
 
         const sqlCompletion = await openai.chat.completions.create({
             model: "gpt-4o",
-            temperature: 0, // Precisão absoluta no SQL
+            temperature: 0,
             messages: [{ role: "system", content: promptSQL }]
         });
 
-        let sqlQuery = sqlCompletion.choices[0].message.content.trim();
-        sqlQuery = sqlQuery.replace(/^```sql/i, '').replace(/^```/, '').replace(/```$/i, '').trim();
+        let sqlQuery = sqlCompletion.choices[0].message.content.replace(/```sql/ig, '').replace(/```/g, '').trim();
         sqlGerado = sqlQuery;
 
-        if (!sqlQuery.toLowerCase().startsWith('select')) {
-            console.error("❌ SQL Inválido.");
-            break;
-        }
+        if (!sqlQuery.toLowerCase().startsWith('select')) continue;
 
         try {
-            console.log(`   [Tentativa ${tentativa}] Query: ${sqlQuery}`);
+            console.log(`   [Tentativa ${tentativa}] Executando: ${sqlQuery}`);
             const dbResponse = await pool.query(sqlQuery);
             if (dbResponse.rows.length > 0) {
                 queryResult = dbResponse.rows;
-                console.log(`   ✅ Sucesso! Encontrou ${queryResult.length} produto(s) no Nível ${tentativa}.`);
-                break;
-            } else {
-                console.log(`   ⚠️ Sem dados. Escalando protocolo para Nível ${tentativa + 1}...`);
-                tentativa++;
+                console.log(`   ✅ Sucesso! Econtramos ${queryResult.length} registros.`);
+                break; // Achou, para o loop!
             }
-        } catch (dbError) {
-            console.error('   ❌ Falha de sintaxe SQL:', dbError.message);
-            tentativa++;
+        } catch (error) {
+            console.error("   ❌ Erro de Sintaxe SQL no Nível", tentativa, error.message);
         }
     }
-
     return { data: queryResult, query: sqlGerado };
 }
 
-/**
- * 4. AGENTE MONTADOR DE DADOS (Technical Drafter)
- */
-async function agenteRedator(mensagemCliente, dbProdutos, manual, intent) {
-    console.log("✍️ [Drafting] Montando relatório técnico...");
+// ==========================================
+// 3. REDATOR/AUDITOR DE SAÍDA DE DADOS (WHATSAPP)
+// ==========================================
+async function agenteRedatorAuditor(mensagem, dbProdutos, intent) {
+    console.log("✍️⚖️ [Redator/Auditor Engenheiro] Formatando dados para o WhatsApp...");
+    const temDados = dbProdutos && dbProdutos.length > 0;
 
-    let diretrizArquitetura = "";
+    let diretriz = `Você é um Engenheiro Consultor Especialista Interlight focado em WhatsApp e atendimento B2B/B2C. 
+Seja extremamente educado, prático, objetivo e muito técnico. 
+[REGRAS OBRIGATÓRIAS]
+- NADA DE PROLIXIDADE. Nenhuma saudação de mais de 1 linha.
+- É PROIBIDO usar adjetivos de marketing como 'design minimalista', 'elegante', 'sofisticado' se houverem dados reais. 
+- Use *negrito* para destacar números técnicos e nomes estruturados (Markdown nativo do WhatsApp).`;
 
-    // Sem palestrinha se foi busca por código
-    if (intent === "produto_direto") {
-        diretrizArquitetura = `
-[PROIBIÇÃO DE TEORIA]: O cliente enviou um código de produto específico (produto_direto). 
-VOCÊ ESTÁ ABSOLUTAMENTE PROIBIDO de iniciar a mensagem com aulas, regras do manual, saudações longas ou conceitos teóricos.
-Vá DIRETO aos dados técnicos do produto. 
-
-Obrigatório:
-1. [Análise Técnica Curta]: Vá direto ao ponto ("O modelo X é um produto...").
-2. [Tabela de Dados].
-`;
+    if (intent === "conceito_tecnico") {
+        diretriz += `\n\n[INSTRUÇÃO]: Responda a dúvida conceitual/técnica do cliente BASEADO ESTRITAMENTE NESTE MANUAL EXATO:\n\n${manualTecnico}\n\nFoque em extrair as explicações de engenharia exigidas (Ex: IP67, IK10 de impacto, STP - Proteção Térmica, materiais) sem encher linguiça. Se o trecho de código anterior trouxe ${dbProdutos.length} produtos relacionais, mostre-os em seguida.\n`;
+    } else if (intent === "produto_exato" && temDados) {
+        diretriz += `\n\n[INSTRUÇÃO]: Vá DIRETO PARA A TABELA. Zero preâmbulos teóricos sobre a peça. Apresente os dados.\n`;
     } else {
-        diretrizArquitetura = `
-[CONSULTORIA TÉCNICA]:
-1. [Análise Técnica Curta]: Use as regras de luminosidade do manual (máx 2 linhas).
-2. [Tabela de Dados].
-`;
+        diretriz += `\n\n[INSTRUÇÃO]: Explique rapidamente a indicação baseada no manual (ex: indicar o IP correto se pediu algo de área externa) e mostre os dados.\n`;
     }
 
-    const promptRedator = `
-Você é o Consultor Técnico Especialista Master da Interlight. A precisão do dado é seu objetivo.
+    if (temDados) {
+        diretriz += `\nFormate OBRIGATORIAMENTE CADA produto encontrado nesta lista estrita estruturada usando bullet points:\n- *Ref:* [referencia_completa] | *Pot:* [potencia_w] | *Fluxo:* [fluxo_lum_luminaria_lm] | *IP:* [grau_de_protecao]\n`;
+    } else if (intent !== "conceito_tecnico") {
+        diretriz += `\n[INSTRUÇÃO - VETO A ALUCINAÇÃO]: Diga de forma educada como Engenheiro que não localizou a referência EXATA que ele pediu em nosso banco de dados no momento, e pergunte se ele possui mais algum detalhe técnico do projeto ou o CÓDIGO INTERLIGHT para refinar a busca. Você está terminantemente proibido de alucinar ou inventar qualquer código técnico.\n`;
+    }
 
-${diretrizArquitetura}
+    const prompt = `${diretriz}
 
-Máscara OBRIGATÓRIA da Tabela (Construa exatamente linha por linha para CADA produto): 
-Ref: [referencia_completa] | Linha: [linha] | Pot: [potencia_w] | Fluxo: [fluxo_lum_luminaria_lm] | IP: [grau_de_protecao] | IRC: [irc_ra_r1_r8] | Man: [manual] | IES: [ies]
-
-Dados Recuperados do BD:
+DADOS RETORNADOS DO BANCO DE DADOS PostgreSQL:
 ${JSON.stringify(dbProdutos)}
 
-Mensagem do Cliente: "${mensagemCliente}"
+(Auditoria Suprema: VOCÊ NÃO PODE DIZER 'Infelizmente não encontrei' SE O JSON ACIMA NÃO ESTIVER VAZIO. SE TIVER PRODUTOS NO JSON, VOCÊ É OBRIGADO A EXIBI-LOS NA TABELA FORMATADA DO WHATSAPP.)
 
-Se "Dados Recuperados" estiver vazio, seja claro, mas evite desculpas emotivas.
-`;
+Cliente disse: "${mensagem}"`;
 
     const txtCompletion = await openai.chat.completions.create({
         model: "gpt-4o",
         temperature: 0.1,
-        messages: [{ role: "system", content: promptRedator }]
+        messages: [{ role: "system", content: prompt }]
     });
 
     return txtCompletion.choices[0].message.content.trim();
 }
 
-/**
- * 5. AGENTE AUDITOR DE DADOS (Bloqueio de Falso Negativo)
- */
-async function agenteAuditor(draftResposta, dbProdutos) {
-    console.log("⚖️ [Auditor] Validando dados e censurando jargões fracos...");
-
-    const temDados = dbProdutos && dbProdutos.length > 0;
-
-    const promptAuditoria = `
-Você é o Agente Supervisor de Qualidade.
-DADOS REAIS: ${JSON.stringify(dbProdutos)}
-O SISTEMA TROUXE DADOS? ${temDados ? "SIM. VOCÊ TEM DADOS TÉCNICOS." : "NÃO."}
-
-RASCUNHO A AVALIAR:
-"${draftResposta}"
-
-REGRA DE BLOQUEIO DE ERRO:
-Se [O SISTEMA TROUXE DADOS?] = SIM, e o Rascunho contem a palavra "Infelizmente", "não encontrei", "desculpe" ou qualquer jargão de frustração, o Redator cometeu uma falha crítica.
-Neste caso, REJEITE o rascunho e reescreva-o exibindo friamente a tabela de dados técnicos conforme a máscara "Ref: [ref] | Linha: [linha] | Pot: [potencia_w] | Fluxo: [fluxo_lum_luminaria_lm] | IP: [grau_de_protecao] | IRC: [irc_ra_r1_r8] | Man: [manual] | IES: [ies]" usando OS DADOS REAIS da linha e os links.
-
-Não use Markdown (\`\`\`json). Retorne apenas:
-{
-  "aprovado": true/false,
-  "resposta_corrigida": "Retorne aqui o rascunho exato original ou a sua reescrita de correção."
-}
-`;
-
-    const auditCompletion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        temperature: 0,
-        messages: [{ role: "system", content: promptAuditoria }],
-        response_format: { type: "json_object" }
-    });
-
-    const auditoria = JSON.parse(auditCompletion.choices[0].message.content);
-
-    if (temDados && !auditoria.aprovado) {
-        console.log(`   🚨 [CENSURA ATIVADA] O supervisor bloqueou um falso negativo. Forçando a entrega dos ${dbProdutos.length} produtos.`);
-    } else {
-        console.log(`   ✅ [Auditor] Conformidade OK.`);
-    }
-
-    return auditoria.resposta_corrigida;
-}
-
-
 // ==========================================
-// ROTA PRINCIPAL INVOCANDO TODOS OS AGENTES
+// ROTA PRINCIPAL: MESA DE PRODUÇÃO N8N -> RENDER
 // ==========================================
 app.post('/chat', async (req, res) => {
-    const token = req.headers['authorization'];
-    if (token !== 'Bearer INTERLIGHT_2026_CHAT') {
-        return res.status(401).json({ error: 'Acesso Negado.' });
+    // Segurança com Bearer Token
+    if (req.headers['authorization'] !== 'Bearer INTERLIGHT_2026_CHAT') {
+        return res.status(401).json({ error: 'Acesso Negado à Mesa de Operadores.' });
     }
 
     const { message, sessionId = 'default_session_id' } = req.body;
 
-    if (!message) {
-        return res.status(400).json({ error: 'A propriedade "message" é obrigatória.' });
-    }
+    if (!message) return res.status(400).json({ error: 'A propriedade message é obrigatória no Body.' });
 
     console.log(`\n\n===========================================`);
-    console.log(`🗣️ CLIENTE PEDE: "${message}"`);
-
-    // Sanitização Radical - Extrai códigos limpos removendo "modelo", "ref:", etc.
-    const termoLimpo = extrairCodigoBusca(message);
-    console.log(`🧹 CÓDIGO/TERMO TRATADO: "${termoLimpo}"`);
+    console.log(`📲 [WhatsApp Client] Mensagem Recebida: "${message}"`);
 
     try {
         const session = getSession(sessionId);
 
-        // PASSO 1: Roteador
-        const roteamento = await agenteRoteador(message, session.context);
-        session.context = { ...session.context, ...roteamento.novo_contexto };
-        session.history.push({ role: "user", content: message });
+        // 1. Sanitização
+        const termoLimpo = extrairCodigoBusca(message);
+        console.log(`🧹 [Regex Cleaner] Termo Extraído: "${termoLimpo}"`);
 
-        console.log(`📍 Intenção de Consultoria: ${roteamento.intent} | Contexto Técnico:`, session.context);
+        // 2. Roteamento de Intenção
+        const intent = await agenteRoteador(message);
+        console.log(`🧠 [Roteamento] Intenção Detectada: "${intent}"`);
 
-        let queryResult = [];
-        let metadataSQL = "";
+        // 3. Orquestração de Dados Híbrida em 3 Níveis
+        const sqlResult = await agenteSQLDataHunter(message, termoLimpo, intent);
 
-        // PASSO 2: Preparar Busca (Tradução ou Acesso Direto)
-        if (roteamento.intent.includes("produto")) {
-            const specsTecnicas = await agenteConsultor(message, termoLimpo, session.context, roteamento.intent);
+        // 4. Construção Final e Auditoria de Alta Performance
+        const respostaFinal = await agenteRedatorAuditor(message, sqlResult.data, intent);
 
-            // PASSO 3: Eng. de Dados -> Busca Híbrida 3 Níveis exatos/parciais
-            const sqlAgentResponse = await agenteSQLDataHunter(specsTecnicas);
-            queryResult = sqlAgentResponse.data;
-            metadataSQL = sqlAgentResponse.query;
-        }
+        session.history.push({ role: "user", content: message }, { role: "assistant", content: respostaFinal });
 
-        // PASSO 4: Drafting da Tabela de Engenharia (Proibição de Aula caso Direto)
-        const rascunho = await agenteRedator(message, queryResult, manualTecnico, roteamento.intent);
-
-        // PASSO 5: Acesso de Conformidade c/ Bloqueio de Erro Genérico
-        const respostaFinal = await agenteAuditor(rascunho, queryResult);
-
-        session.history.push({ role: "assistant", content: respostaFinal });
-
+        console.log(`✉️ [Outbound] Enviando resposta ao N8N com ${sqlResult.data.length} dados de catálogo.`);
         console.log(`===========================================\n`);
 
         return res.json({
             resposta: respostaFinal,
             _metadata: {
-                sqlQueryGerada: metadataSQL,
-                registrosEncontrados: queryResult.length,
-                orquestracao: "Consultor Técnico Exato (3 Níveis Híbridos)"
+                orquestracao: intent,
+                registros_retornados: sqlResult.data.length,
+                termo_limpo_via_regex: termoLimpo,
+                queryConsultada: sqlResult.query
             }
         });
 
     } catch (error) {
-        console.error('🔥 Erro Crítico no Sistema:', error);
-        return res.status(500).json({ error: 'Erro de processamento interno no Engine Interlight.' });
+        console.error('🔥 Erro Crítico Orquestrador:', error);
+        return res.status(500).json({ error: 'Erro interno na infraestrutura da mesa de produção de agentes (Render Server).' });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 [Interlight Consultoria Exata] ONLINE na porta ${PORT}`);
+    console.log(`🚀 [Engenharia Consultiva Interlight] ONLINE na porta ${PORT} - Aguardando webhooks`);
 });
