@@ -37,7 +37,7 @@ function extrairCodigoBusca(mensagem) {
 }
 
 const GLOSSARIO = `SIGLAS: PM=Preto Microtexturizado, BR=Branco, MT=Metalizado.`;
-const TABLE_SCHEMA = `Colunas Principais: referencia_completa, linha, tipologia, sub_tipologia, descricao, cores, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao, irc_ra_r1_r8, ies, manual`;
+const TABLE_SCHEMA = `Colunas Principais: produtos, linha, tipologia, sub_tipologia, descricao, cores, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao, irc_ra_r1_r8, ies, manual`;
 
 // ==========================================
 // 1. AGENTE ROTEADOR
@@ -75,16 +75,17 @@ async function agenteSQLDataHunter(mensagem, termoLimpo, intent, historico = [])
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
         let regra = "";
-        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha alvo na mensagem ou no CONTEXTO. EXCLUA palavras como 'linha', 'modelo', 'luminária'. Crie um SELECT básico usando: WHERE referencia_completa ILIKE '%seu_termo_isolado%' OR linha ILIKE '%seu_termo_isolado%'`;
-        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave e ISOLADO do pedido e crie um SELECT usando: WHERE referencia_completa ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
+        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha alvo na mensagem ou no CONTEXTO. EXCLUA palavras como 'linha', 'modelo', 'luminária'. Crie um SELECT básico usando: WHERE produtos ILIKE '%seu_termo_isolado%' OR linha ILIKE '%seu_termo_isolado%'`;
+        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave e ISOLADO do pedido e crie um SELECT usando: WHERE produtos ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
         if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Crie um SELECT usando: WHERE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' OR usabilidade_principal ILIKE '%seu_termo%'`;
 
         const promptSQL = `Você é um robô gerador de SQL PostgreSQL focado em criar filtros precisos. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais, finais ou marcação de código markdown.
         Base de Colunas Válidas: ${TABLE_SCHEMA} 
         Regra de Busca Estratégica: ${regra}
         Contexto da Conversa: ${JSON.stringify(historico.slice(-4))}
-        Mensagem do Cliente (Aja com base nesta última mensagem): "${mensagem}"
-        Retorne as colunas: referencia_completa, linha, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao. Não aplique LIMIT, traga todos os resultados.`;
+        Mensagem Original do Cliente: "${mensagem}"
+        Termo Sugerido Limpo pela Regex: "${termoLimpo}" (Use este termo preferencialmente para o ILIKE)
+        Retorne as colunas: produtos, linha, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao. Não aplique LIMIT, traga todos os resultados.`;
 
         const sqlCompletion = await openai.chat.completions.create({
             model: "gpt-4o",
@@ -127,19 +128,20 @@ Seja extremamente educado, prático, objetivo e muito técnico.
 - Use *negrito* para destacar números técnicos e nomes estruturados (Markdown nativo do WhatsApp).`;
 
     if (intent === "conceito_tecnico") {
-        diretriz += `\n\n[INSTRUÇÃO CRÍTICA]: O cliente fez uma pergunta conceitual ou pediu detalhes de uma linha (Ex: "Flat"). Você DEVE ler toda a string de "manualTecnico", localizar a linha ou o conceito (IP, IK) e explicá-lo cientificamente.
-[MANUAL DA INTERLIGHT]:\n${manualTecnico}\n\nApós a explicação técnica, VOCÊ É OBRIGADO a mostrar os produtos encontrados na tabela abaixo (se a array não estiver vazia).\n`;
+        diretriz += `\n\n[INSTRUÇÃO CRÍTICA MISTA]: O cliente perguntou sobre uma linha/conceito.
+REGRA 1: Busque no [MANUAL DA INTERLIGHT] abaixo. Se encontrar, explique. Se NÃO encontrar menção à linha, NUNCA diga "não está no manual". Simplesmente pule a explicação teórica e vá direto para a tabela de produtos.
+[MANUAL DA INTERLIGHT]:\n${manualTecnico}\n\nREGRA 2: Após a teoria (ou anulando a teoria se não achou), se o array do PostgreSQL tiver produtos, VOCÊ É ESTRITAMENTE OBRIGADO a exibir a tabela. A ausência da linha no manual NÃO justifica ocultar os produtos do banco.\n`;
     } else if (intent === "produto_exato" && temDados) {
-        diretriz += `\n\n[INSTRUÇÃO]: O cliente quer comprar. Vá DIRETO PARA A TABELA. Zero preâmbulos teóricos sobre a peça. Apresente os dados em formato WhatsApp.\n`;
+        diretriz += `\n\n[INSTRUÇÃO]: Vá DIRETO PARA A TABELA. Zero preâmbulos teóricos sobre a peça. Apresente os dados em formato WhatsApp.\n`;
     } else {
-        diretriz += `\n\n[INSTRUÇÃO]: Recomende as luminárias da tabela relacionando com o pedido do cliente (ex: se pediu externa, diga o IP).\n`;
+        diretriz += `\n\n[INSTRUÇÃO]: Recomende as luminárias da tabela ou explique algo breve e mostre os dados.\n`;
     }
 
     if (temDados) {
-        diretriz += `\n[INSTRUÇÃO CRÍTICA EXCEL]: Formate OBRIGATORIAMENTE TODOS OS ${dbProdutos.length} PRODUTOS retornados no JSON abaixo usando bullet points. NÃO OMITA NENHUM ITEM.
-- *Ref:* [referencia_completa] | *Pot:* [potencia_w] | *Fluxo:* [fluxo_lum_luminaria_lm] | *IP:* [grau_de_protecao]\n`;
+        diretriz += `\n[INSTRUÇÃO CRÍTICA EXCEL]: Formate OBRIGATORIAMENTE TODOS OS ${dbProdutos.length} PRODUTOS retornados no JSON abaixo usando bullet points. NÃO OMITA NENHUM ITEM. NENHUM MESMO.
+- *Ref:* [produtos] | *Pot:* [potencia_w] | *Fluxo:* [fluxo_lum_luminaria_lm] | *IP:* [grau_de_protecao]\n`;
     } else if (intent === "produto_exato" || intent === "produto_consultivo") {
-        diretriz += `\n[INSTRUÇÃO - FALHA NA BUSCA]: Diga educadamente que não localizou a referência EXATA que ele pediu em nosso banco de dados no momento, e pergunte se ele possui mais algum detalhe do projeto (ou o CÓDIGO INTERLIGHT correto). É PROIBIDO inventar códigos.\n`;
+        diretriz += `\n[INSTRUÇÃO - FALHA NA BUSCA]: Diga educadamente que não localizou a referência EXATA em nosso banco de dados, e peça mais dados do projeto. É PROIBIDO inventar códigos.\n`;
     }
 
     const prompt = `${diretriz}
@@ -147,7 +149,7 @@ Seja extremamente educado, prático, objetivo e muito técnico.
 DADOS RETORNADOS DO BANCO DE DADOS PostgreSQL (Exiba todos, sem exceção):
 ${JSON.stringify(dbProdutos)}
 
-(Regra de Ouro: Se a Array acima tiver itens, você NUNCA pode dizer que 'não encontrou'. Apresente as listas. Se for um conceito_tecnico e a Array estiver vazia, foque apenas em ensinar sobre o manual.)
+(Regra de Ouro: O Banco de Dados é a LEI MÁXIMA. Se há produtos na array JSON acima, VOCÊ NÃO PODE DIZER que não há dados, E É OBRIGADO a formatá-los. Ignore o manual se precisar, mas não ignore o BD.)
 
 Mensagem do Cliente: "${mensagem}"`;
 
