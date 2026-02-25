@@ -42,12 +42,14 @@ const TABLE_SCHEMA = `Colunas Principais: referencia_completa, linha, tipologia,
 // ==========================================
 // 1. AGENTE ROTEADOR
 // ==========================================
-async function agenteRoteador(mensagem) {
+async function agenteRoteador(mensagem, historico = []) {
     console.log("🧭 [Agente Roteador] Classificando intenção...");
     const prompt = `Classifique a intenção do cliente da Interlight rigorosamente: 
 - "produto_exato": Contém estritamente códigos ou referências diretas do catálogo (ex: "2153.S.PM", "5103").
 - "produto_consultivo": Busca por aplicação em um projeto (ex: "preciso de uma luminária de piso externa").
 - "conceito_tecnico": Pergunta sobre teoria, normas, IP67, IK, ou DETALHES DE UMA LINHA DE PRODUTOS (ex: "características da linha flat", "como funciona a linha orion"). 
+
+Contexto da Conversa: ${JSON.stringify(historico.slice(-4))}
 
 Responda OBRIGATORIAMENTE JSON: { "intent": "produto_exato" ou "produto_consultivo" ou "conceito_tecnico" }`;
 
@@ -63,24 +65,25 @@ Responda OBRIGATORIAMENTE JSON: { "intent": "produto_exato" ou "produto_consulti
 // ==========================================
 // 2. DATA HUNTER (SQL) - BUSCA EM 3 NÍVEIS
 // ==========================================
-async function agenteSQLDataHunter(mensagem, termoLimpo, intent) {
+async function agenteSQLDataHunter(mensagem, termoLimpo, intent, historico = []) {
     console.log(`🕵️ [Engenheiro de Dados SQL] Iniciando busca para intenção: ${intent} | termoLimpo: ${termoLimpo}`);
     let queryResult = [];
     let sqlGerado = "";
 
     // Se for conceito técnico puro sem fornecer uma linha ou código, pula o banco
-    if (intent === "conceito_tecnico" && termoLimpo.length < 3) return { data: [], query: "N/A" };
+    if (intent === "conceito_tecnico" && termoLimpo.length < 3 && historico.length === 0) return { data: [], query: "N/A" };
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
         let regra = "";
-        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha (Ex: Flat, 5103, 2153.S.PM) na mensagem do cliente. EXCLUA palavras como 'linha', 'modelo', 'luminária'. Crie um SELECT básico usando: WHERE referencia_completa ILIKE '%seu_termo_isolado%' OR linha ILIKE '%seu_termo_isolado%'`;
+        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha alvo na mensagem ou no CONTEXTO. EXCLUA palavras como 'linha', 'modelo', 'luminária'. Crie um SELECT básico usando: WHERE referencia_completa ILIKE '%seu_termo_isolado%' OR linha ILIKE '%seu_termo_isolado%'`;
         if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave e ISOLADO do pedido e crie um SELECT usando: WHERE referencia_completa ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
         if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Crie um SELECT usando: WHERE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' OR usabilidade_principal ILIKE '%seu_termo%'`;
 
         const promptSQL = `Você é um robô gerador de SQL PostgreSQL focado em criar filtros precisos. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais, finais ou marcação de código markdown.
         Base de Colunas Válidas: ${TABLE_SCHEMA} 
         Regra de Busca Estratégica: ${regra}
-        Mensagem do Cliente: "${mensagem}"
+        Contexto da Conversa: ${JSON.stringify(historico.slice(-4))}
+        Mensagem do Cliente (Aja com base nesta última mensagem): "${mensagem}"
         Retorne as colunas: referencia_completa, linha, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao. Não aplique LIMIT, traga todos os resultados.`;
 
         const sqlCompletion = await openai.chat.completions.create({
@@ -146,7 +149,7 @@ ${JSON.stringify(dbProdutos)}
 
 (Regra de Ouro: Se a Array acima tiver itens, você NUNCA pode dizer que 'não encontrou'. Apresente as listas. Se for um conceito_tecnico e a Array estiver vazia, foque apenas em ensinar sobre o manual.)
 
-Cliente disse: "${mensagem}"`;
+Mensagem do Cliente: "${mensagem}"`;
 
     const txtCompletion = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -181,11 +184,11 @@ app.post('/chat', async (req, res) => {
         console.log(`🧹 [Regex Cleaner] Termo Extraído: "${termoLimpo}"`);
 
         // 2. Roteamento de Intenção
-        const intent = await agenteRoteador(message);
+        const intent = await agenteRoteador(message, session.history);
         console.log(`🧠 [Roteamento] Intenção Detectada: "${intent}"`);
 
         // 3. Orquestração de Dados Híbrida em 3 Níveis
-        const sqlResult = await agenteSQLDataHunter(message, termoLimpo, intent);
+        const sqlResult = await agenteSQLDataHunter(message, termoLimpo, intent, session.history);
 
         // 4. Construção Final e Auditoria de Alta Performance
         const respostaFinal = await agenteRedatorAuditor(message, sqlResult.data, intent);
