@@ -84,10 +84,9 @@ DIRETRIZES FUNDAMENTAIS:
 1. SEJA OBJETIVO: Responda de forma rápida e focada na venda e especificação técnica.
 2. USO OBRIGATÓRIO DO BANCO DE DADOS: Toda recomendação técnica ou citação de produto DEVE ser validada chamando a função 'consultar_catalogo_sql' para pegar os dados reais do banco. NUNCA invente códigos (referências). NUNCA cite um produto sem olhar no banco de dados primeiro.
 3. FORMATO OBRIGATÓRIO DE RESPOSTA (quando houver recomendação de produtos):
-   [Explicação técnica breve do Manual] -> [Produto Sugerido] -> [Código de Referência]
-   Exemplo:
-   Embutidos de solo precisam de proteção IP67 e IK10 além de dreno. -> Flat IN de 12V 2700K. -> Referência: 3345-S-PM-27
-4. USO DO MANUAL: Use o manual técnico fornecido apenas para fornecer a "[Explicação técnica breve]". Não transcreva seções ou textos longos.
+   A sua recomendação precisa ser uma resposta curta e técnica. É OBRIGATÓRIO incluir uma pequena tabela para cada produto sugerido exatamente no formato abaixo:
+   Ref: [referencia_completa] | Linha: [linha] | Potência: [potencia_w] | IP: [grau_de_protecao]
+4. USO DO MANUAL: Use o manual técnico fornecido apenas para dar contexto. Não transcreva o manual.
 
 BANCO DE DADOS:
 ${TABLE_SCHEMA}
@@ -123,13 +122,13 @@ app.post('/chat', async (req, res) => {
                 type: "function",
                 function: {
                     name: "consultar_catalogo_sql",
-                    description: "Busca no catálogo real de produtos Interlight via query SQL. OBRIGATÓRIO usar esta função sempre que o cliente pedir referências, produtos, sugestões de compra ou especificações.",
+                    description: "Busca produtos no banco PostgreSQL Interlight. OBRIGATÓRIO usar quando sugerir produtos. O schema possui especificamente: referencia_completa, linha, tipologia, sub_tipologia, descricao, potencia_w, fluxo_lum_luminaria_lm, cct_k, grau_de_protecao.",
                     parameters: {
                         type: "object",
                         properties: {
                             query_sql: {
                                 type: "string",
-                                description: "A query PostgreSQL (apenas comando SELECT). Use ILIKE para buscas em texto (Ex: descricao ILIKE '%embutido%'). Retorne SEMPRE a coluna referencia_completa junto aos outros dados necessários. Limite em no máximo 10 ou 15 resultados."
+                                description: "A query SELECT para o BD. REGRA OBRIGATÓRIA: Para buscar termos (como 'balizador') busque nas colunas 'tipologia', 'sub_tipologia' ou 'usabilidade_principal' usando ILIKE ignorando acentos textualmente se puder ou contendo coringas (Ex: tipologia ILIKE '%balizador%'). Selecione SEMPRE referencia_completa, linha, potencia_w, grau_de_protecao e as demais colunas extras que precisar. Limite os resultados entre 5 e 10."
                             }
                         },
                         required: ["query_sql"]
