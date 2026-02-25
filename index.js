@@ -3,8 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const { OpenAI } = require('openai');
-
 const fs = require('fs');
+
 const manualTecnico = fs.readFileSync('manual_interlight.txt.txt', 'utf8');
 
 const app = express();
@@ -18,7 +18,7 @@ const openai = new OpenAI({
 
 // Configuração do Supabase (via PostgreSQL client direto)
 const pool = new Pool({
-    connectionString: process.env.SUPABASE_DATABASE_URL,
+    connectionString: process.env.SUPABASE_DATABASE_URL, // Variável segura do Render / .env
 });
 
 const TABLE_SCHEMA = `
@@ -77,119 +77,161 @@ Colunas disponíveis:
 - irc
 `;
 
+const SYSTEM_PROMPT = `Você é um Vendedor Técnico Objetivo e Especialista em Iluminação da Interlight.
+Sua missão é atender clientes de forma direta, comercial e tecnicamente precisa, sem ser prolixo ou teórico demais.
+
+DIRETRIZES FUNDAMENTAIS:
+1. SEJA OBJETIVO: Responda de forma rápida e focada na venda e especificação técnica.
+2. USO OBRIGATÓRIO DO BANCO DE DADOS: Toda recomendação técnica ou citação de produto DEVE ser validada chamando a função 'consultar_catalogo_sql' para pegar os dados reais do banco. NUNCA invente códigos (referências). NUNCA cite um produto sem olhar no banco de dados primeiro.
+3. FORMATO OBRIGATÓRIO DE RESPOSTA (quando houver recomendação de produtos):
+   [Explicação técnica breve do Manual] -> [Produto Sugerido] -> [Código de Referência]
+   Exemplo:
+   Embutidos de solo precisam de proteção IP67 e IK10 além de dreno. -> Flat IN de 12V 2700K. -> Referência: 3345-S-PM-27
+4. USO DO MANUAL: Use o manual técnico fornecido apenas para fornecer a "[Explicação técnica breve]". Não transcreva seções ou textos longos.
+
+BANCO DE DADOS:
+${TABLE_SCHEMA}
+
+MANUAL TÉCNICO INTERLIGHT:
+---
+${manualTecnico}
+---
+`;
+
 app.post('/chat', async (req, res) => {
-    // 1. A TRANCA DE SEGURANÇA
+    // 1. SEGURANÇA NA ROTA
     const token = req.headers['authorization'];
     if (token !== 'Bearer INTERLIGHT_2026_CHAT') {
         return res.status(401).json({ error: 'Acesso Negado. API exclusiva.' });
     }
+
     console.log("🔔 NOVA PERGUNTA CHEGOU DO N8N:", req.body.message);
     try {
         const { message } = req.body;
-
         if (!message) {
             return res.status(400).json({ error: 'A propriedade "message" é obrigatória.' });
         }
 
-        // =========================================================================
-        // PASSO 1: Interpretar a mensagem e gerar a instrução SQL SELECT
-        // =========================================================================
-        const sqlCompletion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            temperature: 0,
-            messages: [
-                {
-                    role: "system",
-                    content: `Você é um assistente especialista em conversão de linguagem natural para queries SQL PostgreSQL para um catálogo de iluminação.
-A sua ÚNICA função é retornar UMA QUERY SQL (apenas leitura - SELECT) com base no esquema fornecido.
-Use APENAS as colunas descritas no esquema abaixo.
+        const messages = [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: message }
+        ];
 
-Regras:
-1. Retorne ESTRITAMENTE o texto da query SQL. Sem blocos markdown de código (sem crases), sem explicações.
-2. A query DEVE consultar a tabela "public"."interlight_catalog_raw".
-3. Use cláusulas ILIKE para buscas em campos de texto de forma a ignorar case-sensitive e buscar por aproximação (ex: cores ILIKE '%Branco%').
-4. Não limite em 1 resultado a não ser que o cliente peça especificamente. Mas pode usar um LIMIT razoável (ex: LIMIT 50) para evitar respostas imensas.
-5. REGRA TEÓRICA (CRÍTICA): Se a pergunta pedir uma explicação, um conceito, começar com "O que é", "Como iluminar", "Qual a diferença", ou pedir dicas gerais de iluminação, NÃO BUSQUE PRODUTOS NO CATÁLOGO. Retorne ESTRITAMENTE e APENAS esta query: SELECT 'teoria' AS tipo;
-
-6. REGRA TEÓRICA: Se a pergunta for puramente teórica e não precisar de catálogo (ex: "O que é ofuscamento?"), retorne exatamente esta query: SELECT 'teoria' AS tipo;
-
-Esquema do Banco de Dados:
-${TABLE_SCHEMA}`
-                },
-                {
-                    role: "user",
-                    content: message
+        // Definindo as Ferramentas (Functions) para a Inteligência Artificial
+        const tools = [
+            {
+                type: "function",
+                function: {
+                    name: "consultar_catalogo_sql",
+                    description: "Busca no catálogo real de produtos Interlight via query SQL. OBRIGATÓRIO usar esta função sempre que o cliente pedir referências, produtos, sugestões de compra ou especificações.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            query_sql: {
+                                type: "string",
+                                description: "A query PostgreSQL (apenas comando SELECT). Use ILIKE para buscas em texto (Ex: descricao ILIKE '%embutido%'). Retorne SEMPRE a coluna referencia_completa junto aos outros dados necessários. Limite em no máximo 10 ou 15 resultados."
+                            }
+                        },
+                        required: ["query_sql"]
+                    }
                 }
-            ]
+            }
+        ];
+
+        let sqlQueryGerada = null;
+        let registrosEncontrados = 0;
+
+        // =========================================================================
+        // PASSO 1: Chamada Inicial para AI (Ela decide se responde direto ou se chama a Função)
+        // =========================================================================
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            temperature: 0.1, // Temperatura baixa para respostas lógicas e objetivas
+            messages: messages,
+            tools: tools,
+            tool_choice: "auto" // A IA escolhe automaticamente chamar nossa função de banco de dados
         });
 
-        let sqlQuery = sqlCompletion.choices[0].message.content.trim();
-
-        // Limpeza de possíveis formatações Markdown residuais
-        sqlQuery = sqlQuery.replace(/^```sql/, '').replace(/^```/, '').replace(/```$/, '').trim();
-
-        // Segurança: Verificar se é apenas uma query de leitura
-        if (!sqlQuery.toLowerCase().startsWith('select')) {
-            return res.status(400).json({ error: 'Query gerada inválida ou insegura (apenas SELECT permitido).' });
-        }
+        const responseMessage = completion.choices[0].message;
+        let finalAnswer = responseMessage.content;
 
         // =========================================================================
-        // PASSO 2: Executar a Query no banco Supabase
+        // PASSO 2: A IA Clicou no Botão de Buscar no Banco de Dados (Chamou a Function Calling)
         // =========================================================================
-        let queryResult;
-        try {
-            const dbResponse = await pool.query(sqlQuery);
-            queryResult = dbResponse.rows;
-        } catch (dbError) {
-            console.error('Erro ao executar a query SQL:', dbError);
-            return res.status(500).json({ error: 'Falha ao consultar o banco de dados.' });
-        }
+        if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+            // Guarda a intenção de buscar no histórico
+            messages.push(responseMessage);
 
-        // =========================================================================
-        // PASSO 3: Formular a resposta final pro cliente baseada nos resultados
-        // =========================================================================
-        const finalCompletion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            temperature: 0,
-            messages: [
-                {
-                    role: "system",
-                    content: `Você é um Engenheiro e Lighting Designer Sênior da Interlight.
-Responda a dúvida do cliente de forma elegante, didática e comercial.
+            for (const toolCall of responseMessage.tool_calls) {
+                if (toolCall.function.name === "consultar_catalogo_sql") {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    let sqlQuery = args.query_sql.trim();
 
-PERGUNTA TEÓRICA: Se os DADOS DO CATÁLOGO retornarem [{"tipo":"teoria"}] ou se estiverem vazios devido a uma pergunta conceitual, NUNCA diga que "não encontrou produtos". Simplesmente aja como professor e explique o conceito usando APENAS o MANUAL TÉCNICO.
----
-${manualTecnico}
----
+                    // Limpando de marcações Markdown
+                    sqlQuery = sqlQuery.replace(/^```sql/, '').replace(/^```/, '').replace(/```$/, '').trim();
+                    sqlQueryGerada = sqlQuery;
 
-BUSCA DE PRODUTOS: Se o catálogo trouxer produtos reais, cruze os conceitos do manual com os DADOS DO CATÁLOGO para recomendar as luminárias exatas:
----
-${JSON.stringify(queryResult)}
----
+                    // Proteção Extra: bloqueando Delete e Update
+                    if (!sqlQuery.toLowerCase().startsWith('select')) {
+                        messages.push({
+                            tool_call_id: toolCall.id,
+                            role: "tool",
+                            name: "consultar_catalogo_sql",
+                            content: JSON.stringify({ error: "Query inválida. Você só tem acesso ao comando SELECT." })
+                        });
+                        continue; // Bloqueia e passa pro próximo
+                    }
 
-Regra: Se o cliente fez uma pergunta teórica, baseie-se no manual. Se ele pediu produtos, cruze os conceitos do manual com os dados do catálogo para criar a recomendação perfeita.`
-                },
-                {
-                    role: "user",
-                    content: req.body.message
+                    try {
+                        console.log(`\n🔍 [Pesquisa Banco de Dados]: ${sqlQuery}\n`);
+                        // Rodando o SELECT real
+                        const dbResponse = await pool.query(sqlQuery);
+                        const resultData = dbResponse.rows;
+                        registrosEncontrados = resultData.length;
+
+                        // Passamos o dado pra IA e instruímos o que fazer via histórico
+                        messages.push({
+                            tool_call_id: toolCall.id,
+                            role: "tool",
+                            name: "consultar_catalogo_sql",
+                            content: JSON.stringify(resultData)
+                        });
+                    } catch (dbError) {
+                        console.error('Erro na query PostgreSQL:', dbError);
+                        messages.push({
+                            tool_call_id: toolCall.id,
+                            role: "tool",
+                            name: "consultar_catalogo_sql",
+                            content: JSON.stringify({ error: "Erro na leitura do BD. Fale pro usuário que houve uma instabilidade interna." })
+                        });
+                    }
                 }
-            ]
-        });
+            }
 
-        const finalAnswer = finalCompletion.choices[0].message.content.trim();
+            // =========================================================================
+            // PASSO 3: Formata a resposta matadora de vendas final usando os produtos retornados do banco.
+            // =========================================================================
+            const finalCompletion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                temperature: 0.1,
+                messages: messages
+            });
 
-        // Retornamos a resposta e, opcionalmente, os metadados
+            finalAnswer = finalCompletion.choices[0].message.content.trim();
+        }
+
+        // Devolvendo para o n8n
         return res.json({
             resposta: finalAnswer,
             _metadata: {
-                sqlQueryGerada: sqlQuery,
-                registrosEncontrados: queryResult.length
+                sqlQueryGerada,
+                registrosEncontrados
             }
         });
 
     } catch (error) {
-        console.error('Erro na rota /chat:', error);
-        return res.status(500).json({ error: 'Erro interno no servidor.' });
+        console.error('Erro geral na rota /chat:', error);
+        return res.status(500).json({ error: 'Erro interno no servidor do Render.' });
     }
 });
 
