@@ -73,14 +73,14 @@ async function agenteSQLDataHunter(mensagem, termoLimpo, intent) {
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
         let regra = "";
-        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha (ex: Flat, 5103, 2153.S.PM) na mensagem e busque na coluna 'referencia_completa' Crie SELECT. ONDE referencia_completa ILIKE '%seu_termo%' ou linha ILIKE '%seu_termo%'`;
-        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Crie SELECT ONDE referencia_completa ILIKE '%seu_termo%' ou descricao ILIKE '%seu_termo%' usando o melhor termo chave do pedido.`;
-        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Identifique a necessidade e o tipo de luminária e Crie SELECT ONDE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' ou usabilidade_principal ILIKE '%seu_termo%'`;
+        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha (Ex: Flat, 5103, 2153.S.PM) na mensagem do cliente. Crie um SELECT básico usando: WHERE referencia_completa ILIKE '%seu_termo%' OR linha ILIKE '%seu_termo%'`;
+        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave do pedido e crie um SELECT usando: WHERE referencia_completa ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
+        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Identifique a necessidade e o tipo de luminária e crie um SELECT usando: WHERE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' OR usabilidade_principal ILIKE '%seu_termo%'`;
 
-        const promptSQL = `Retorne APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais ou finais ou marcação markdown.
-        Base: ${TABLE_SCHEMA} | Glossário: ${GLOSSARIO}
+        const promptSQL = `Você é um robô gerador de SQL PostgreSQL. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais, finais ou marcação de código markdown.
+        Base de Colunas Válidas: ${TABLE_SCHEMA} 
         Regra de Busca Estratégica: ${regra}
-        O Cliente pediu exatamente via Input do WhatsApp: ${mensagem}
+        Mensagem Original do Cliente (Extraia o termo daqui para o ILIKE): "${mensagem}"
         Retorne pelo menos as colunas referencia_completa, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao
         LIMIT 5`;
 
@@ -125,17 +125,19 @@ Seja extremamente educado, prático, objetivo e muito técnico.
 - Use *negrito* para destacar números técnicos e nomes estruturados (Markdown nativo do WhatsApp).`;
 
     if (intent === "conceito_tecnico") {
-        diretriz += `\n\n[INSTRUÇÃO CRÍTICA]: O cliente fez uma pergunta sobre a linha ou sobre um conceito técnico. Você DEVE ler toda a string de "manualTecnico" abaixo, localizar as referências ao que ele pediu (ex: "Flat") e explicar as características de engenharia reais como IP, material e fixação.\n\n[MANUAL BASE DA INTERLIGHT]:\n${manualTecnico}\n\nResponda primeiro com essa teoria do manual. Se e somente se o BD abaixo estiver preenchido com PRODUTOS, coloque-os na tabela.\n`;
+        diretriz += `\n\n[INSTRUÇÃO CRÍTICA]: O cliente fez uma pergunta conceitual ou pediu detalhes de uma linha (Ex: "Flat"). Você DEVE ler toda a string de "manualTecnico", localizar a linha ou o conceito (IP, IK) e explicá-lo cientificamente.
+[MANUAL DA INTERLIGHT]:\n${manualTecnico}\n\nApós a explicação técnica, VOCÊ É OBRIGADO a mostrar os produtos encontrados na tabela abaixo (se a array não estiver vazia).\n`;
     } else if (intent === "produto_exato" && temDados) {
-        diretriz += `\n\n[INSTRUÇÃO]: Vá DIRETO PARA A TABELA. Zero preâmbulos teóricos sobre a peça. Apresente os dados.\n`;
+        diretriz += `\n\n[INSTRUÇÃO]: O cliente quer comprar. Vá DIRETO PARA A TABELA. Zero preâmbulos teóricos sobre a peça. Apresente os dados em formato WhatsApp.\n`;
     } else {
-        diretriz += `\n\n[INSTRUÇÃO]: Explique rapidamente a indicação baseada no manual (ex: indicar o IP correto se pediu algo de área externa) e mostre os dados da tabela.\n`;
+        diretriz += `\n\n[INSTRUÇÃO]: Recomende as luminárias da tabela relacionando com o pedido do cliente (ex: se pediu externa, diga o IP).\n`;
     }
 
     if (temDados) {
-        diretriz += `\nFormate OBRIGATORIAMENTE CADA produto encontrado nesta lista estrita estruturada usando bullet points:\n- *Ref:* [referencia_completa] | *Pot:* [potencia_w] | *Fluxo:* [fluxo_lum_luminaria_lm] | *IP:* [grau_de_protecao]\n`;
-    } else if (intent !== "conceito_tecnico") {
-        diretriz += `\n[INSTRUÇÃO - VETO A ALUCINAÇÃO]: Diga de forma educada como Engenheiro que não localizou a referência EXATA que ele pediu em nosso banco de dados no momento, e pergunte se ele possui mais algum detalhe técnico do projeto ou o CÓDIGO INTERLIGHT para refinar a busca. Você está terminantemente proibido de alucinar ou inventar qualquer código técnico.\n`;
+        diretriz += `\nFormate OBRIGATORIAMENTE CADA produto do array JSON usando bullet points:
+- *Ref:* [referencia_completa] | *Pot:* [potencia_w] | *Fluxo:* [fluxo_lum_luminaria_lm] | *IP:* [grau_de_protecao]\n`;
+    } else if (intent === "produto_exato" || intent === "produto_consultivo") {
+        diretriz += `\n[INSTRUÇÃO - FALHA NA BUSCA]: Diga educadamente que não localizou a referência EXATA que ele pediu em nosso banco de dados no momento, e pergunte se ele possui mais algum detalhe do projeto (ou o CÓDIGO INTERLIGHT correto). É PROIBIDO inventar códigos.\n`;
     }
 
     const prompt = `${diretriz}
@@ -143,7 +145,7 @@ Seja extremamente educado, prático, objetivo e muito técnico.
 DADOS RETORNADOS DO BANCO DE DADOS PostgreSQL:
 ${JSON.stringify(dbProdutos)}
 
-(Auditoria: Se a lista do BD acima vier vazia [ ], mas a intenção for 'conceito_tecnico', IGNORE OS PRODUTOS e diga apenas as definições encontradas no MANUAL.)
+(Regra de Ouro: Se a Array acima tiver itens, você NUNCA pode dizer que 'não encontrou'. Apresente as listas. Se for um conceito_tecnico e a Array estiver vazia, foque apenas em ensinar sobre o manual.)
 
 Cliente disse: "${mensagem}"`;
 
