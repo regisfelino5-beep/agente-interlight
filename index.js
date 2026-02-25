@@ -32,8 +32,8 @@ function extrairCodigoBusca(mensagem) {
     let termo = mensagem;
     const lixo = [/modelo/ig, /referação/ig, /referencia/ig, /ref:/ig, /ref/ig, /peça/ig, /codigo/ig, /código/ig, /luminária/ig, /luminaria/ig];
     lixo.forEach(regex => { termo = termo.replace(regex, '') });
-    // Mantém letras, números, pontos e hífens. Ex: 2153.S.PM
-    return termo.replace(/[^a-zA-Z0-9.\-]/g, '').trim();
+    // Mantém letras, números, pontos, hífens e espaços. Ex: 2153.S.PM ou Linha Flat
+    return termo.replace(/[^a-zA-Z0-9.\-\s]/g, '').trim();
 }
 
 const GLOSSARIO = `SIGLAS: PM=Preto Microtexturizado, BR=Branco, MT=Metalizado.`;
@@ -73,9 +73,9 @@ async function agenteSQLDataHunter(mensagem, termoLimpo, intent) {
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
         let regra = "";
-        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Crie SELECT ONDE referencia_completa ILIKE '${termoLimpo}%'`;
-        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Crie SELECT ONDE referencia_completa ILIKE '%${termoLimpo}%' ou descricao ILIKE '%${termoLimpo}%'`;
-        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Crie SELECT ONDE linha ILIKE '%${termoLimpo}%' OR tipologia ILIKE '%${termoLimpo}%' ou usabilidade_principal ILIKE '%${termoLimpo}%'`;
+        if (tentativa === 1) regra = `NÍVEL 1: Busca EXATA. Identifique o código, referência ou nome da linha (ex: Flat, 5103, 2153.S.PM) na mensagem e busque na coluna 'referencia_completa' Crie SELECT. ONDE referencia_completa ILIKE '%seu_termo%' ou linha ILIKE '%seu_termo%'`;
+        if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Crie SELECT ONDE referencia_completa ILIKE '%seu_termo%' ou descricao ILIKE '%seu_termo%' usando o melhor termo chave do pedido.`;
+        if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Identifique a necessidade e o tipo de luminária e Crie SELECT ONDE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' ou usabilidade_principal ILIKE '%seu_termo%'`;
 
         const promptSQL = `Retorne APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais ou finais ou marcação markdown.
         Base: ${TABLE_SCHEMA} | Glossário: ${GLOSSARIO}
@@ -125,11 +125,11 @@ Seja extremamente educado, prático, objetivo e muito técnico.
 - Use *negrito* para destacar números técnicos e nomes estruturados (Markdown nativo do WhatsApp).`;
 
     if (intent === "conceito_tecnico") {
-        diretriz += `\n\n[INSTRUÇÃO]: Responda a dúvida conceitual/técnica do cliente BASEADO ESTRITAMENTE NESTE MANUAL EXATO:\n\n${manualTecnico}\n\nFoque em extrair as explicações de engenharia exigidas (Ex: IP67, IK10 de impacto, STP - Proteção Térmica, materiais) sem encher linguiça. Se o trecho de código anterior trouxe ${dbProdutos.length} produtos relacionais, mostre-os em seguida.\n`;
+        diretriz += `\n\n[INSTRUÇÃO CRÍTICA]: O cliente fez uma pergunta sobre a linha ou sobre um conceito técnico. Você DEVE ler toda a string de "manualTecnico" abaixo, localizar as referências ao que ele pediu (ex: "Flat") e explicar as características de engenharia reais como IP, material e fixação.\n\n[MANUAL BASE DA INTERLIGHT]:\n${manualTecnico}\n\nResponda primeiro com essa teoria do manual. Se e somente se o BD abaixo estiver preenchido com PRODUTOS, coloque-os na tabela.\n`;
     } else if (intent === "produto_exato" && temDados) {
         diretriz += `\n\n[INSTRUÇÃO]: Vá DIRETO PARA A TABELA. Zero preâmbulos teóricos sobre a peça. Apresente os dados.\n`;
     } else {
-        diretriz += `\n\n[INSTRUÇÃO]: Explique rapidamente a indicação baseada no manual (ex: indicar o IP correto se pediu algo de área externa) e mostre os dados.\n`;
+        diretriz += `\n\n[INSTRUÇÃO]: Explique rapidamente a indicação baseada no manual (ex: indicar o IP correto se pediu algo de área externa) e mostre os dados da tabela.\n`;
     }
 
     if (temDados) {
@@ -143,7 +143,7 @@ Seja extremamente educado, prático, objetivo e muito técnico.
 DADOS RETORNADOS DO BANCO DE DADOS PostgreSQL:
 ${JSON.stringify(dbProdutos)}
 
-(Auditoria Suprema: VOCÊ NÃO PODE DIZER 'Infelizmente não encontrei' SE O JSON ACIMA NÃO ESTIVER VAZIO. SE TIVER PRODUTOS NO JSON, VOCÊ É OBRIGADO A EXIBI-LOS NA TABELA FORMATADA DO WHATSAPP.)
+(Auditoria: Se a lista do BD acima vier vazia [ ], mas a intenção for 'conceito_tecnico', IGNORE OS PRODUTOS e diga apenas as definições encontradas no MANUAL.)
 
 Cliente disse: "${mensagem}"`;
 
