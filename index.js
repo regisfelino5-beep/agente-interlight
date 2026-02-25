@@ -77,12 +77,11 @@ async function agenteSQLDataHunter(mensagem, termoLimpo, intent) {
         if (tentativa === 2) regra = `NÍVEL 2: Busca PARCIAL. Identifique o melhor termo chave e ISOLADO do pedido e crie um SELECT usando: WHERE referencia_completa ILIKE '%seu_termo%' OR descricao ILIKE '%seu_termo%'`;
         if (tentativa === 3) regra = `NÍVEL 3: Busca AMPLA. Crie um SELECT usando: WHERE linha ILIKE '%seu_termo%' OR tipologia ILIKE '%seu_termo%' OR usabilidade_principal ILIKE '%seu_termo%'`;
 
-        const promptSQL = `Você é um robô gerador de SQL PostgreSQL. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais, finais ou marcação de código markdown.
+        const promptSQL = `Você é um robô gerador de SQL PostgreSQL focado em criar filtros precisos. Retorne OBRIGATORIAMENTE E APENAS o comando SELECT válido em PostgreSQL. Sem aspas iniciais, finais ou marcação de código markdown.
         Base de Colunas Válidas: ${TABLE_SCHEMA} 
         Regra de Busca Estratégica: ${regra}
-        Mensagem Original do Cliente (Extraia o termo daqui para o ILIKE): "${mensagem}"
-        Retorne pelo menos as colunas referencia_completa, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao
-        LIMIT 5`;
+        Mensagem do Cliente: "${mensagem}"
+        Retorne as colunas: referencia_completa, linha, potencia_w, fluxo_lum_luminaria_lm, grau_de_protecao. Não aplique LIMIT, traga todos os resultados.`;
 
         const sqlCompletion = await openai.chat.completions.create({
             model: "gpt-4o",
@@ -134,7 +133,7 @@ Seja extremamente educado, prático, objetivo e muito técnico.
     }
 
     if (temDados) {
-        diretriz += `\nFormate OBRIGATORIAMENTE CADA produto do array JSON usando bullet points:
+        diretriz += `\n[INSTRUÇÃO CRÍTICA EXCEL]: Formate OBRIGATORIAMENTE TODOS OS ${dbProdutos.length} PRODUTOS retornados no JSON abaixo usando bullet points. NÃO OMITA NENHUM ITEM.
 - *Ref:* [referencia_completa] | *Pot:* [potencia_w] | *Fluxo:* [fluxo_lum_luminaria_lm] | *IP:* [grau_de_protecao]\n`;
     } else if (intent === "produto_exato" || intent === "produto_consultivo") {
         diretriz += `\n[INSTRUÇÃO - FALHA NA BUSCA]: Diga educadamente que não localizou a referência EXATA que ele pediu em nosso banco de dados no momento, e pergunte se ele possui mais algum detalhe do projeto (ou o CÓDIGO INTERLIGHT correto). É PROIBIDO inventar códigos.\n`;
@@ -142,7 +141,7 @@ Seja extremamente educado, prático, objetivo e muito técnico.
 
     const prompt = `${diretriz}
 
-DADOS RETORNADOS DO BANCO DE DADOS PostgreSQL:
+DADOS RETORNADOS DO BANCO DE DADOS PostgreSQL (Exiba todos, sem exceção):
 ${JSON.stringify(dbProdutos)}
 
 (Regra de Ouro: Se a Array acima tiver itens, você NUNCA pode dizer que 'não encontrou'. Apresente as listas. Se for um conceito_tecnico e a Array estiver vazia, foque apenas em ensinar sobre o manual.)
