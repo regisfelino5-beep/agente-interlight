@@ -24,8 +24,6 @@ const pool = new Pool({
 // ==========================================
 // ESTADO PERSISTENTE (MEMÓRIA DE SESSÃO)
 // ==========================================
-// Em produção no Render (sem Redis), usamos um objeto na memória RAM.
-// O n8n deve mandar um "sessionId" (ex: número_do_whatsapp) para mantermos o contexto.
 const sessions = {};
 
 function getSession(id) {
@@ -41,6 +39,20 @@ function getSession(id) {
         };
     }
     return sessions[id];
+}
+
+// ==========================================
+// UTILITÁRIOS - EXTRATOR DE DADOS
+// ==========================================
+/**
+ * Extrai apenas números e letras de uma mensagem de busca direta.
+ * Ex: "Você tem o modelo 5103 aí?" -> "Voce tem o modelo 5103 ai"
+ * Preserva o código limpo para o banco de dados.
+ */
+function extrairTermoBusca(mensagem) {
+    // Remove pontuações que atrapalham o LIKE ou caracteres especiais
+    const termoLimpo = mensagem.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    return termoLimpo;
 }
 
 // ==========================================
@@ -62,28 +74,29 @@ Colunas Principais: referencia_completa, linha, tipologia, sub_tipologia, descri
 `;
 
 // ==========================================
-// AGENTES DA ORQUESTRAÇÃO
+// AGENTES DA ORQUESTRAÇÃO ALTA PERFORMANCE
 // ==========================================
 
 /**
  * 1. AGENTE ROTEADOR
- * Analisa a pergunta se é teórica (manual) ou de especificação de produto,
- * e retém o contexto (State Persistent).
+ * Identifica se é uma busca direta de código (morte ao preâmbulo), consultiva (dor do cliente) ou teoria.
  */
 async function agenteRoteador(mensagem, sessionContext) {
-    console.log("� [Agente Roteador] Roteando intenção...");
+    console.log("🧭 [Agente Roteador] Roteando intenção...");
     const prompt = `
 Você é o Agente Roteador da Interlight.
-Defina a intenção ("produto" ou "teoria") e extraia o contexto histórico.
-Ex: Se o cliente falar de 'cor preta' e o contexto tinha 'linha Allinear', mantenha 'Allinear'.
+Classifique a intenção do usuário:
+- "produto_direto": O cliente fornece um código, referência, número ou nome da linha bem específico (ex: "5103", "luminária PM 10W", "Allinear").
+- "produto_consultivo": O cliente pede sugestões para um problema ou ambiente (ex: "luz para espelho", "como iluminar passagem").
+- "teoria": Quer saber sobre conceitos (ex: "o que é ofuscamento?").
 
 Contexto Anterior: ${JSON.stringify(sessionContext)}
 Nova Mensagem: "${mensagem}"
 
-Responda em JSON:
+Responda OBRIGATORIAMENTE em JSON:
 {
-  "intent": "produto" ou "teoria",
-  "novo_contexto": { "linha": "...", "cor": "..." }
+  "intent": "produto_direto" ou "produto_consultivo" ou "teoria",
+  "novo_contexto": { "linha": "...", "cor": "..." } // Mantenha o contexto anterior se aplicar.
 }
 `;
     const response = await openai.chat.completions.create({
@@ -97,22 +110,27 @@ Responda em JSON:
 
 /**
  * 2. CONSULTOR TÉCNICO (Manual Master)
- * Traduz a dor do cliente (ex: luz no chão, ofuscamento) para especificações SQL.
  */
-async function agenteConsultor(mensagem, contextoAcumulado) {
-    console.log("🧙 [Consultor Técnico] Traduzindo problema para linguagem de banco de dados...");
+async function agenteConsultor(mensagemOriginal, termoLimpo, contextoAcumulado, intent) {
+    console.log("🧙 [Consultor Técnico] Preparando specs de busca...");
+
+    // Se for direto de código/linha, não precisa deduzir nada. Basta mandar caçar o termo puro e cru.
+    if (intent === "produto_direto") {
+        return `Busca direta pelo termo exato ou codigo: "${termoLimpo}". Contexto retido: ${JSON.stringify(contextoAcumulado)}`;
+    }
+
+    // Se for consultivo, ele traduz o problema
     const prompt = `
-Você é o Consultor Técnico da Interlight (Manual Master).
-Traduza o problema do cliente em especificações de banco de dados lendo as regras do manual.
+Você é o Consultor Técnico da Interlight.
+Traduza o problema do cliente em parâmetros descritivos para o Especialista SQL.
 ${GLOSSARIO}
+MANUAL: ${manualTecnico.substring(0, 1500)} // Resumo
 
-MANUAL:
-${manualTecnico.substring(0, 1500)} // Resumo
+Cliente quer: "${mensagemOriginal}"
+Contexto: ${JSON.stringify(contextoAcumulado)}
 
-Cliente quer: "${mensagem}"
-Contexto retido: ${JSON.stringify(contextoAcumulado)}
-
-Responda apenas com a frase de instrução de busca. Ex: "Buscar linha Allinear, tipologia embutido de solo, cor Preto Microtexturizado, com IP67".
+Retorne APENAS um texto descritivo claro do que buscar no banco. 
+Ex: "Buscar luminárias de sobrepor, cor preta, ideal para fachadas, IP65."
 `;
     const response = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -123,33 +141,36 @@ Responda apenas com a frase de instrução de busca. Ex: "Buscar linha Allinear,
 }
 
 /**
- * 3. AGENTE ESPECIALISTA SQL (Data Hunter)
- * Cria a query SQL. Se falhar, tenta autonomamente buscas mais amplas (LIKE %termo%).
+ * 3. ESPECIALISTA SQL (Data Hunter - 3 LEVELS FALLBACK)
+ * Tenta até 3 vezes ir flexibilizando as colunas para garantir que não volte vazio.
  */
 async function agenteSQLDataHunter(especificacoes) {
-    console.log(`🕵️ [Agente SQL] Preparando caçada de dados para: ${especificacoes}`);
+    console.log(`🕵️ [Agente SQL] Caçada de 3 Níveis iniciada para: ${especificacoes}`);
 
     let tentativa = 1;
     let queryResult = [];
     let sqlGerado = "";
 
-    // Autonomia para até 2 tentativas progressivamente mais amplas
-    while (tentativa <= 2) {
+    while (tentativa <= 3) {
+        let instrucaoNivel = "";
+        if (tentativa === 1) instrucaoNivel = "NÍVEL 1 (Exatidão): Crie a query priorizando buscar EXATAMENTE na coluna 'referencia_completa' (usando ILIKE '%termo%') ou cruzando linha e cor certas.";
+        if (tentativa === 2) instrucaoNivel = "NÍVEL 2 (Linha/Tipo): O Nível 1 falhou. Abandone a busca restrita por referência exata. Busque amplamente nas colunas 'linha', 'tipologia' ou 'sub_tipologia' usando ILIKE '%termo%'.";
+        if (tentativa === 3) instrucaoNivel = "NÍVEL 3 (Desespero Comercial): Nível 2 falhou! Busque de qualquer forma na coluna 'descricao' usando ILIKE ignorando acentos ou fragmentos das palavras-chave. Não volte de mãos vazias!";
+
         const promptSQL = `
-Você é o Especialista SQL Data Hunter da Interlight.
-Sua única função é gerar UMA query PostgreSQL SELECT para a tabela "public"."interlight_catalog_raw".
+Você é o Especialista SQL da Interlight. Retorne APENAS o comando SELECT, sem \`\`\`sql. Nenhuma aspa extra!
 
 Pedido Técnico: ${especificacoes}
-Tentativa Atual: ${tentativa} (Se for a tentativa 2, seja MUITO mais permissivo com os filtros, use ILIKE '%termo%' com curingas em várias colunas e remova filtros restritos de cor ou linha).
+Estratégia: ${instrucaoNivel}
 
 ${GLOSSARIO}
 ${TABLE_SCHEMA}
 
-REGRAS ESTABELECIDAS:
-1. Retorne APENAS a string da query. Sem marcação Markdown (\`\`\`sql).
-2. Selecione SEMPRE as colunas: referencia_completa, linha, potencia_w, grau_de_protecao, descricao, cores.
-3. Ignore acentos usando \`unaccent()\` se disponível, ou confie no ILIKE com '%'.
-4. Limite a 5 resultados.
+Regras:
+1. Retorne APENAS a string SQL! 
+2. Colunas obrigatórias: referencia_completa, linha, potencia_w, grau_de_protecao, descricao, cores.
+3. Use ILIKE '%termo%' para ignorar maiúsculas nas buscas de texto.
+4. LIMIT 6
 `;
 
         const sqlCompletion = await openai.chat.completions.create({
@@ -159,28 +180,28 @@ REGRAS ESTABELECIDAS:
         });
 
         let sqlQuery = sqlCompletion.choices[0].message.content.trim();
-        sqlQuery = sqlQuery.replace(/^```sql/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        sqlQuery = sqlQuery.replace(/^```sql/i, '').replace(/^```/, '').replace(/```$/i, '').trim();
         sqlGerado = sqlQuery;
 
         if (!sqlQuery.toLowerCase().startsWith('select')) {
-            console.error("❌ [Agente SQL] Gerou query perigosa. Abortando.");
+            console.error("❌ SQL Inválido.");
             break;
         }
 
         try {
-            console.log(`   [Tentativa ${tentativa}] Query: ${sqlQuery}`);
+            console.log(`   [Tentativa ${tentativa}] ${sqlQuery}`);
             const dbResponse = await pool.query(sqlQuery);
             if (dbResponse.rows.length > 0) {
                 queryResult = dbResponse.rows;
-                console.log(`   ✅ [Agente SQL] Encontrou ${queryResult.length} produto(s).`);
-                break; // Achou! Sai do loop.
+                console.log(`   ✅ Achou ${queryResult.length} produto(s) no Nível ${tentativa}!`);
+                break;
             } else {
-                console.log(`   ⚠️ [Agente SQL] Nenhum dado encontrado. Ampliando busca...`);
-                tentativa++; // Vai tentar de novo sendo mais permissivo
+                console.log(`   ⚠️ Zero achados. Escalando para Nível ${tentativa + 1}...`);
+                tentativa++;
             }
         } catch (dbError) {
-            console.error('   ❌ [Agente SQL] Erro de sintaxe na query:', dbError.message);
-            tentativa++; // Errou a sintaxe, tenta gerar outra
+            console.error('   ❌ Falha de sintaxe SQL:', dbError.message);
+            tentativa++; // Pula para a próxima estratégia que fará outra query
         }
     }
 
@@ -189,27 +210,43 @@ REGRAS ESTABELECIDAS:
 
 /**
  * 4. AGENTE REDATOR (Draft Builder)
- * Monta a resposta respeitando estritamente a arquitetura de entrega exigida.
  */
-async function agenteRedator(mensagemCliente, dbProdutos, manual, contexto) {
-    console.log("✍️ [Agente Redator] Escrevendo a primeira versão da resposta...");
+async function agenteRedator(mensagemCliente, dbProdutos, manual, intent) {
+    console.log("✍️ [Redator] Escrevendo rascunho de venda...");
+
+    let diretrizArquitetura = "";
+
+    // MORTE AO PREÂMBULO PARA PRODUTO DIRETO
+    if (intent === "produto_direto") {
+        diretrizArquitetura = `
+[ATENÇÃO - MORTE AO PREÂMBULO]: O cliente fez uma busca direta. Você está TERMINANTEMENTE PROIBIDO de iniciar com textos de conceitos ou manuais teóricos.
+VÁ DIRETO AO PONTO:
+1. Mostre Imediatamente a [Tabela de Produtos Reais].
+2. Encerre com a [Chamada para Ação].
+`;
+    } else {
+        diretrizArquitetura = `
+ARQUITETURA:
+1. [Conceito Técnico Curto]: Máximo de 1 a 2 linhas com base no manual.
+2. [Tabela de Produtos Reais].
+3. [Chamada para Ação].
+`;
+    }
+
     const promptRedator = `
-Você é um Vendedor Técnico Especialista da Interlight.
-Você DEVE estruturar sua resposta na exata arquitetura a seguir. NENHUMA linha de código inventada é tolerada.
+Você é o Vendedor de Alta Performance Interlight.
 
-ARQUITETURA DE ENTREGA OBRIGATÓRIA:
-1. [Conceito Técnico]: Uma frase rápida citando uma regra do manual alinhada com a requisição do cliente.
-2. [Tabela de Produtos Reais]: Cada produto encontrado DEVE ser apresentado como linha nesta exata máscara:
-   Ref: [referencia_completa] | Linha: [linha] | Potência: [potencia_w] | IP: [grau_de_protecao]
-3. [Chamada para Ação]: Finalizar perguntando como o cliente deseja evoluir.
+${diretrizArquitetura}
 
-PRODUTOS ENCONTRADOS (ZERO ALUCINAÇÃO - Se estiver vazio, avise com elegância):
+Máscara da Tabela (USE EXATAMENTE ESSE FORMATO PARA CADA PRODUTO):
+Ref: [referencia_completa] | Linha: [linha] | Potência: [potencia_w] | IP: [grau_de_protecao]
+
+Produtos Encontrados:
 ${JSON.stringify(dbProdutos)}
 
-MANUAL DE REFERÊNCIA (Trecho):
-${manual.substring(0, 1000)}
+(Se os produtos vierem vazios, aí sim você pode pedir a confirmação da referência educadamente)
 
-Escreva a resposta final para o cliente ("${mensagemCliente}"):
+Mensagem do Cliente: "${mensagemCliente}"
 `;
 
     const txtCompletion = await openai.chat.completions.create({
@@ -222,30 +259,31 @@ Escreva a resposta final para o cliente ("${mensagemCliente}"):
 }
 
 /**
- * 5. AGENTE AUDITOR (O Revisor)
- * Avalia de forma crítica se o Redator seguiu todas as ordens e reescreve se necessário.
+ * 5. AGENTE AUDITOR (VETO SUPREMO)
  */
 async function agenteAuditor(draftResposta, dbProdutos) {
-    console.log("⚖️ [Agente Auditor] Auditando a resposta final...");
+    console.log("⚖️ [Auditor] Checando bloqueios comerciais...");
+
+    const temDados = dbProdutos && dbProdutos.length > 0;
+
     const promptAuditoria = `
-Você é o Agente Auditor Final da Interlight, o nível mais alto de exigência de qualidade de vendas.
-Revise o Rascunho abaixo.
-Critérios de Aprovação:
-1. Tem o bloco [Conceito Técnico] curto e profissional?
-2. Tem a Tabela preenchida no formato "Ref: [ref] | Linha: [linha] | Potência: [W] | IP: [IP]" usando APENAS dados reais fornecidos? (Se a lista de produtos reais estava vazia, ele avisou civilizadamente?)
-3. Tem o [Chamada para Ação]?
-4. Zero invenção (alucinação) de códigos PM, referências.
+Você é o Auditor de Vendas Interlight. Seu foco é não perder nenhuma venda.
+DADOS REAIS TRAZIDOS DO BANCO (SQL): ${JSON.stringify(dbProdutos)}
+O SISTEMA TEM DADOS DE PRODUTOS? ${temDados ? "SIM. VOCÊ TEM DADOS COMERCIAIS DISPONÍVEIS!" : "NÃO."}
 
-Produtos Reais (como base de validação para acusar a falsa invenção):
-${JSON.stringify(dbProdutos)}
-
-Rascunho a Avaliar:
+RASCUNHO DO REDATOR:
 "${draftResposta}"
 
-Sua saída DEVE OBRIGATORIAMENTE ser um JSON contendo a correção se necessário (sem blocos markdown):
+REGRA DE VETO:
+Se [O SISTEMA TEM DADOS DE PRODUTOS] = SIM, e o Rascunho contem a palavra "Infelizmente", "não encontrei", "não tenho" ou "não achei", o Redator enlouqueceu!
+Neste caso, REJEITE SUMARIAMENTE E REESCREVA A RESPOSTA VOCÊ MESMO exibindo categoricamente os produtos usando a tabela obrigatória "Ref: [ref] | Linha: [linha] | Potência: [W] | IP: [IP]".
+
+Se aprovado (tudo estiver certo e comercialmente perfeito), apenas devolva "aprovado: true" com o texto exato do rascunho.
+
+JSON de Retorno OBRIGATÓRIO (sem markdown!):
 {
   "aprovado": true/false,
-  "resposta_corrigida": "Se aprovado, repita o rascunho igual. Se reprovado, reescreva você mesmo o texto AQUI aplicando TODAS as regras de maneira peremptória sem justificar, apenas o texto final."
+  "resposta_corrigida": "Retorne aqui o texto final (ou a sua própria reescrita impondo a tabela de dados comerciais que foi ignorada)."
 }
 `;
 
@@ -257,7 +295,13 @@ Sua saída DEVE OBRIGATORIAMENTE ser um JSON contendo a correção se necessári
     });
 
     const auditoria = JSON.parse(auditCompletion.choices[0].message.content);
-    console.log(`   [Agente Auditor] Aprovado? ${auditoria.aprovado}`);
+
+    if (temDados && !auditoria.aprovado) {
+        console.log(`   🚨 [VETO ATIVADO] O redator ia pedir desculpas mesmo tendo ${dbProdutos.length} produtos. A resposta foi reescrita forçadamente!`);
+    } else {
+        console.log(`   ✅ [Auditor] Aprovado.`);
+    }
+
     return auditoria.resposta_corrigida;
 }
 
@@ -266,13 +310,11 @@ Sua saída DEVE OBRIGATORIAMENTE ser um JSON contendo a correção se necessári
 // ROTA PRINCIPAL INVOCANDO TODOS OS AGENTES
 // ==========================================
 app.post('/chat', async (req, res) => {
-    // 1. AUtenticação
     const token = req.headers['authorization'];
     if (token !== 'Bearer INTERLIGHT_2026_CHAT') {
         return res.status(401).json({ error: 'Acesso Negado.' });
     }
 
-    // Opcional: O n8n pode mandar um parametro "sessionId" (ex: número do whatsapp) para contexto persistente
     const { message, sessionId = 'default_session_id' } = req.body;
 
     if (!message) {
@@ -280,62 +322,61 @@ app.post('/chat', async (req, res) => {
     }
 
     console.log(`\n\n===========================================`);
-    console.log(`🗣️  NOVA MENSAGEM DO CLIENTE: "${message}"`);
-    console.log(`===========================================`);
+    console.log(`🗣️ CLIENTE: "${message}"`);
+
+    // Extrator de Dados: Pega as letrinhas e numerozinhos crús
+    const termoLimpo = extrairTermoBusca(message);
+    console.log(`🧹 TERMO LIMPO: "${termoLimpo}"`);
 
     try {
-        // Carrega o Session / State
         const session = getSession(sessionId);
 
-        // PASSO 1: O Roteador analisa intenção e atualiza Contexto Persistente
+        // PASSO 1: Roteador
         const roteamento = await agenteRoteador(message, session.context);
-
-        // Contexto Persistente Atualizado!
         session.context = { ...session.context, ...roteamento.novo_contexto };
         session.history.push({ role: "user", content: message });
 
-        console.log(`📍 Intenção: ${roteamento.intent} | Contexto Persistente Atual:`, session.context);
+        console.log(`📍 Intenção: ${roteamento.intent} | Contexto:`, session.context);
 
         let queryResult = [];
         let metadataSQL = "";
-        let specsTecnicas = "";
 
-        // PASSO 2: O Consultor Técnico e Especialista SQL 
-        if (roteamento.intent === 'produto') {
-            specsTecnicas = await agenteConsultor(message, session.context);
-            console.log(`🧠 [Especificações Traduzidas]: ${specsTecnicas}`);
+        // PASSO 2: Consultor & Caçador de Dados
+        if (roteamento.intent.includes("produto")) {
+            const specsTecnicas = await agenteConsultor(message, termoLimpo, session.context, roteamento.intent);
 
+            // O Data Hunter vai tentar 3 vezes com fallbacks (Referência -> Linha -> Descrição)
             const sqlAgentResponse = await agenteSQLDataHunter(specsTecnicas);
             queryResult = sqlAgentResponse.data;
             metadataSQL = sqlAgentResponse.query;
         }
 
-        // PASSO 3: O Redator escreve a resposta
-        const rascunho = await agenteRedator(message, queryResult, manualTecnico, session.context);
+        // PASSO 3: Redator obedecendo à regra "Morte ao Preâmbulo" caso "produto_direto"
+        const rascunho = await agenteRedator(message, queryResult, manualTecnico, roteamento.intent);
 
-        // PASSO 4: O Auditor revisa rigorosamente
+        // PASSO 4: Veto Supremo do Auditor (Protege pra nunca falhar se houver produto SQL)
         const respostaFinal = await agenteAuditor(rascunho, queryResult);
 
-        // Atualiza memória da resposta
         session.history.push({ role: "assistant", content: respostaFinal });
 
-        // Devolve ao n8n
+        console.log(`===========================================\n`);
+
         return res.json({
             resposta: respostaFinal,
             _metadata: {
                 sqlQueryGerada: metadataSQL,
                 registrosEncontrados: queryResult.length,
-                orquestracao: "Multi-Agent Pipeline V1"
+                orquestracao: "Alta Performance V2 (3-Levels + Veto)"
             }
         });
 
     } catch (error) {
         console.error('🔥 Erro na Orquestração Multi-Agente:', error);
-        return res.status(500).json({ error: 'A pipeline de multi-agentes encontrou uma inconsistência.' });
+        return res.status(500).json({ error: 'Erro de processamento interno no Render.' });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🧠 Servidor Multi-Agentes Orquestrado rodando na porta ${PORT}`);
+    console.log(`🚀 [Interlight Vendas de Alta Performance] ONLINE na porta ${PORT}`);
 });
