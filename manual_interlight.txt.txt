@@ -1,0 +1,376 @@
+Como iluminar caminhos e passagens
+________________________________________
+1. Objetivo
+Apresentar diretrizes técnicas para iluminação de caminhos e passagens em áreas externas, abordando conceito, tipologias, técnicas, aplicações, produtos e boas práticas — com foco em segurança, orientação do usuário, conforto visual e integração paisagística.
+________________________________________
+2. Conceitos
+•	Função dupla (design + função): a luz deve orientar o percurso com segurança e, simultaneamente, qualificar o ambiente.
+•	Sem ofuscamento: priorizar óticas e posicionamentos que não lancem luz acima do plano horizontal e não gerem brilho direto ao pedestre ou motorista.
+•	Orientação do percurso: balizadores e soluções correlatas indicam por onde transitar e delimitam áreas não caminháveis (ex.: bordas de piscinas/espelhos d’água).
+•	Integração ao contexto: escolher o efeito antes do produto (o conceito determina a luminária).
+•	Temperatura de cor:
+o	2700 K (quente) realça materiais quentes (ex.: madeira).
+o	4000 K (neutra) valoriza materiais frios (ex.: cimento, granito).
+•	Níveis de iluminância de referência (passagens): reconhecimento do caminho com iluminâncias horizontais baixas (ordem de grandeza citada: ~0,6 a 5 lux).
+________________________________________
+3. Tipologias de iluminação para caminhos
+3.1 Postes/balizadores 360°
+•	Uso: caminhos e áreas abertas, criando uniformidade e ligação visual.
+•	Regra prática de espaçamento (exemplo citado): altura da luminária (em metros) × 15 ≈ distância entre peças.
+3.2 Distribuição assimétrica para piso (ex.: efeito “arco” na parede)
+•	Montagem: em parede/mureta/apoio.
+•	Altura de instalação: entre 15 e 30 cm do piso.
+•	Alcance aproximado: proporção 1:5 (ex.: 20 cm de altura ≈ ~1 m de alcance).
+•	Efeito: discreto, orientativo, sem ofuscamento.
+3.3 Downlight em marquise (teto)
+•	Montagem: embutir ou sobrepor no beiral/marquise.
+•	Função: marcação do piso com alto conforto visual, ideal em corredores/fachadas.
+•	Distribuição: distância entre peças pode considerar relações com o pé-direito (referências citadas na apresentação).
+3.4 Uplight por reflexão (piso → marquise)
+•	Conceito: luz embutida no piso que rebate no teto para iluminar o percurso.
+•	Limite de aplicação: pé-direito até ~4 m (acima disso, o efeito perde eficiência).
+•	Dimensionamento: usar potências/fluxos compatíveis, pois a luz vai ao teto e retorna.
+3.5 Luz linear contínua
+•	Aplicação: condução contínua do olhar e orientação do percurso (em contornos, laterais ou sob elementos).
+•	Observações: soluções flexíveis facilitam contornar elementos; atenção a vedação e fixação em externos.
+3.6 Balizamento orientativo (baixa potência)
+•	Função: indicar e demarcar o caminho (não iluminar objetos).
+•	Cenários típicos: bordas de piscinas, espelhos d’água, passagens longas.
+•	Cuidados: baixa potência, baixo ofuscamento e foco no percurso.
+3.7 Escadas
+•	Objetivo: segurança e orientação no subir/descer.
+•	Posições possíveis: lateral, espelho, piso ou superior (paredes/aran delas).
+•	Diretriz: evitar ofuscamento direto; iluminar ambas as direções de acesso.
+3.8 Circundante pela vegetação
+•	Ideia: iluminar arbustos/plantas adjacentes (faixos mais abertos) para que o caminho receba luz do entorno.
+•	Cuidados: controle de ofuscamento (ex.: acessórios, visores) e direção para a planta, não para o olho.
+•	Árvores altas: a luz nas palmeiras próximas pode rebanter e qualificar o caminho.
+________________________________________
+4. Técnicas e parâmetros práticos
+4.1 Conforto visual
+•	Preferir soluções com a luz direcionada ao piso, ótica oculta e sem vazamento acima do plano horizontal.
+•	Em locais com motoristas/pedestres, evitar brilhos a olho nu.
+4.2 Segurança junto a água
+•	Próximo a piscinas/espelhos d’água, utilizar baixa tensão (12/24 V) nas luminárias indicadas.
+4.3 Cenários com veículos
+•	Em áreas com trânsito de carros, posicionar balizadores de modo que a base da peça receba luz (tornando a presença do corpo visível ao condutor).
+•	Atenção ao posicionamento: se a luz estiver apenas no piso, o corpo do poste pode passar despercebido.
+4.4 Público e percepção
+•	Em percursos de idosos ou pessoas com baixa acuidade visual, evitar feixes muito concentrados que criem luz/sombra marcada no piso; preferir luz uniforme e confortável.
+4.5 Temperatura de cor no percurso
+•	Exemplos citados na apresentação mostram 2700 K e 4000 K aplicados conforme materialidade e intenção de cena.
+________________________________________
+5. Aplicações — exemplos citados
+•	Pisos próximos à água: balizadores orientativos ao longo da borda (baixo ofuscamento).
+•	Corredores externos com marquise: downlight de teto para marcação confortável.
+•	Percursos amplos: postes com distribuição 360° e espaçamento proporcional à altura.
+•	Caminhos com vegetação densa: uso de fincos/embutidos direcionados às plantas, devolvendo luz ao piso.
+•	Escadas externas: balizadores de parede/espelho de degrau ou arandelas de efeito, evitando brilho direto.
+________________________________________
+6. Produtos citados (descrições conforme conteúdo apresentado)
+Observação: abaixo constam os usos e atributos conforme o texto desta apresentação.
+•	Fita de LED (IP67, 24 V, 2700 K)
+Flexível; fornecida em rolos de 5 m; inclui fita dupla face e abraçadeiras para fixação em superfícies porosas.
+•	Sticklite
+Balizador de baixa potência (menos de 1 W); 2700 K; diâmetro reduzido; para marcação de caminho.
+•	Coin
+Balizador de fluxo baixo (difuso, confortável); opções em preto e aço inox; 12 V ou tensão de rede; indicação de passagem.
+•	Multifaxos
+Versão com 4 feixes (decorativo) e versão de 1 feixe (~80 cm de alcance) para indicar direção do percurso; aplicável também em escadas.
+•	Quasa
+Arandela de facho superior e inferior com ajuste manual (≈ 10° a 110°) sem ferramenta; efeito de passagem pela parede.
+•	Poste quadrado “postinho” (~10 cm, feixe ~12°)
+Marcações estreitas no piso com cerca de ~1 m de alcance por ponto (efeito decorativo/orientativo).
+•	Pils (poste/balizador “cogumelo”)
+Altura ajustável (~18 a 40 cm); luz totalmente para baixo; indicado repetidas vezes para percursos sem ofuscamento.
+•	Pils (arandela)
+Versão de parede com iluminação circular confortável para passagens.
+•	Pico (IP54 na versão externa)
+Para uso em marquises (embutir/sobrepor); opções de potência/faixa/acabamentos; marcação do piso por downlight.
+•	Arc (balizador assimétrico “arco”)
+Montado em parede/mureta; arco no piso com distribuição assimétrica voltada para baixo.
+•	Pergo (projetor)
+Instalado em fachadas para iluminar caminho de cima para baixo quando conveniente.
+•	Slim (embutido de piso)
+Minimalista; compatível com serra-copo; aplicável em uplight por reflexão (piso → marquise) em passagens.
+•	Flat In (embutido) / Flat Out (projetor)
+Citados para iluminar arbustos e árvores próximas ao caminho, de modo que a luz retorne ao piso, evitando o uso de postes onde não se deseja.
+•	Finco (projetor em estaca)
+Para vegetação em trajetos; usar direcionamento e acessórios antiofuscamento quando necessário.
+________________________________________
+7. Boas práticas de instalação e operação
+•	Grau de proteção: luminárias externas com IP65/66; embutidos de piso com IP67.
+•	Materiais: alumínio injetado e pintura eletrostática.
+•	Garantia: produtos com 5 anos (observado no material).
+•	Baixa tensão: ampla oferta de versões 12 V/24 V para áreas próximas a água.
+•	Fixação da fita: além da fita dupla face, empregar abraçadeiras em bases porosas.
+•	Manual: seguir o manual de instalação de cada produto.
+•	Proteção elétrica: uso de DPS (dispositivo de proteção contra surtos) em áreas externas.
+•	Vandalismo: preferir soluções embutidas/fixações robustas; em áreas críticas, considerar iluminação de cima (fachada/marquise) para reduzir risco; embutidos de piso demandam ferramenta específica para remoção (segurança adicional).
+________________________________________
+8. Observações e recomendações de profissionais (síntese do conteúdo)
+•	Menos é mais no balizamento: balizadores não servem para “iluminar tudo”, e sim para orientar; usar o mínimo necessário e evitar “pistas de pouso”.
+•	Caminho do usuário: observar como as pessoas realmente andam; o percurso precisa servir ao usuário.
+•	Impacto ambiental: quanto mais baixa a instalação e mais focada a luz, menores os impactos; preferir fontes ocultas ao olho do observador.
+•	Luz refletida: priorizar reflexões e luz indireta, mantendo conforto e segurança; combinar balizadores baixos quando necessário.
+•	Temperaturas de cor: podem ser misturadas quando coerentes com o conceito (ex.: destacar primeiro vs. segundo plano).
+________________________________________
+9. Checklist de projeto
+1.	Definir o efeito desejado (orientativo, uniforme, dramático, refletido etc.).
+2.	Mapear riscos: água, veículos, idosos, vandalismo.
+3.	Escolher tipologia (360°, assimétrico, marquise, reflexão, linear, vegetação, escadas).
+4.	Dimensionar distâncias/alturas conforme as relações e exemplos citados.
+5.	Selecionar temperatura de cor coerente com materiais e narrativa.
+6.	Garantir conforto visual (sem ofuscamento; luz voltada ao piso).
+7.	Em áreas com água, adotar baixa tensão.
+8.	Atender IP adequado e seguir manual de instalação.
+9.	Prever DPS e fixações adequadas (fita + abraçadeiras quando aplicável).
+10.	Validar o resultado em campo e ajustar posicionamentos.
+________________________________________
+Encerramento
+A iluminação de caminhos e passagens deve orientar com segurança, preservar o conforto visual e compor o paisagismo. Ao definir primeiro o conceito e, depois, a luminária, obtém-se percursos claros, agradáveis e tecnicamente corretos.
+
+Apostila Técnica — Linha Flat
+Projetores e Embutidos de Solo para Uso Interno e Externo
+________________________________________
+1. Objetivo
+Este material apresenta as principais características técnicas, sistemas de proteção, índices de segurança e desempenho óptico dos produtos da Linha Flat, destacando sua eficiência, durabilidade e qualidade luminosa.
+O foco está na compreensão prática dos índices IP e IK, no alcance dos fachos de luz e na tecnologia de proteção térmica inteligente (STP).
+________________________________________
+2. Características Gerais da Linha Flat
+A Linha Flat é composta por projetores e embutidos de solo destinados principalmente a aplicações internas e externas.
+Os produtos passam por testes laboratoriais certificados, garantindo alta resistência e desempenho mesmo em condições adversas de uso.
+________________________________________
+3. Índice de Proteção IP67
+3.1 Definição
+O IP (Ingress Protection) é o índice que define o nível de proteção do equipamento contra entrada de poeira e água.
+A Linha Flat possui IP67, uma classificação de alto desempenho para uso externo.
+3.2 Significado técnico
+•	IP6X → Totalmente protegido contra poeira.
+•	IPX7 → Proteção contra imersão temporária em água (até 1 metro, por curto período).
+Importante: IP67 não é indicado para imersão contínua, como em piscinas ou fontes.
+Para aplicações subaquáticas permanentes, o nível recomendado seria IP68.
+3.3 Aplicação prática
+O IP67 permite instalar os produtos Flat em áreas externas sujeitas a chuva intensa ou acúmulo temporário de água, mantendo a integridade e funcionalidade da luminária.
+________________________________________
+4. Índice de Resistência a Impacto IK10
+4.1 Definição
+O IK (Impact Protection) indica a resistência mecânica da luminária a impactos externos.
+Os produtos da Linha Flat possuem IK10, o nível máximo da escala, garantindo alta durabilidade e segurança.
+4.2 Teste de certificação
+O ensaio é realizado com martelo de peso específico, aplicado sobre o vidro de proteção da luminária em diferentes pontos.
+O produto não pode rachar nem quebrar, mesmo após múltiplos impactos.
+4.3 Aplicações típicas
+A resistência IK10 torna os produtos adequados para:
+•	Áreas públicas e urbanas, onde há risco de vandalismo.
+•	Locais de circulação intensa, sujeitos a toques, quedas de objetos ou impactos acidentais.
+•	Ambientes externos de alto tráfego, como calçadas, fachadas e praças.
+________________________________________
+5. Alcance dos Fachos de Luz
+5.1 Percepção visual e contexto
+O alcance do facho depende diretamente do nível de luminosidade do entorno e da refletância das superfícies.
+Ambientes mais escuros e com superfícies claras proporcionam uma melhor percepção da luz e ampliam o alcance visual.
+Em locais muito iluminados ou com paredes escuras, o alcance percebido da luz diminui, mesmo que a intensidade luminosa seja a mesma.
+5.2 Alcances observados
+•	A Linha Flat oferece produtos com alcances perceptíveis de 3 a 20 metros, conforme potência, ângulo de facho e condições do ambiente.
+•	Exemplo citado: um projetor de 16 W com facho de 110° pode proporcionar percepção luminosa até cerca de 20 m de altura em ambientes de jardim pouco iluminados.
+5.3 Considerações técnicas
+O alcance visual é uma percepção subjetiva: a luz se propaga indefinidamente, mas a visibilidade do facho depende do contraste luminância x ambiente.
+Ambientes com pouca luz e superfícies claras sempre geram uma melhor leitura visual do efeito de luz.
+________________________________________
+6. Sistema de Proteção Térmica Inteligente (STP)
+6.1 O que é
+A tecnologia Smart Thermal Protection (STP) é um sistema de monitoramento térmico embutido nas luminárias da Linha Flat.
+Ela tem como função proteger os LEDs e o driver contra superaquecimento, aumentando a vida útil do produto.
+6.2 Como funciona
+•	O sensor interno monitora a temperatura dentro da luminária.
+•	Se detectado calor acima do limite seguro, o sistema:
+o	Reduz automaticamente a intensidade luminosa, ou
+o	Desliga o LED temporariamente até que a temperatura se normalize.
+Esse processo evita danos irreversíveis causados por insolação direta ou alta temperatura ambiente.
+6.3 Benefícios
+•	Preserva a vida útil dos LEDs e do driver.
+•	Mantém a eficiência luminosa mesmo sob variação térmica.
+•	Evita falhas prematuras por sobreaquecimento.
+•	Garante estabilidade de operação em locais expostos ao sol.
+________________________________________
+7. Dissipação de Calor e Eficiência
+7.1 Comparativo de desempenho
+Em testes térmicos com câmera infravermelha, verificou-se que a luminária Flat registrou temperaturas em torno de 40–41 °C, enquanto o produto concorrente atingiu 57 °C ou mais, sob mesmas condições de funcionamento.
+7.2 Causas e efeitos
+O aquecimento excessivo no concorrente ocorreu pela ausência de aletas de dissipação e pelo sistema de carcaça ineficiente.
+Como resultado:
+•	Maior temperatura interna.
+•	Menor eficiência luminosa (“quanto mais calor, menos luz”).
+•	Vida útil reduzida dos LEDs e componentes eletrônicos.
+7.3 Vantagens construtivas da Linha Flat
+•	Corpo em alumínio com aletas de dissipação térmica.
+•	Design otimizado para ventilação e troca de calor.
+•	Proteção STP integrada para controle automático de temperatura.
+________________________________________
+8. Conclusões Técnicas
+•	A Linha Flat é projetada para suportar as condições reais de uso externo — chuva, impacto, calor e variações de luminosidade.
+•	O IP67 garante estanqueidade, o IK10 assegura resistência mecânica e o STP amplia a durabilidade dos LEDs.
+•	Os fachos oferecem excelente desempenho óptico, com alcance variável conforme o ambiente e percepção visual aprimorada em locais de baixa luminosidade.
+•	O projeto térmico é um diferencial que mantém a eficiência luminosa e a vida útil prolongada do sistema.
+________________________________________
+Resumo Final
+Recurso Técnico	Função / Benefício
+IP67	Protege contra poeira e imersão temporária em água.
+IK10	Resistência máxima contra impactos e vandalismo.
+STP – Smart Thermal Protection	Monitora e regula automaticamente a temperatura interna.
+Sistema de Dissipação em Alumínio	Reduz o calor e prolonga a vida útil dos LEDs.
+Alcance Visual dos Fachos	3 m a 20 m conforme ambiente, potência e ângulo.
+________________________________________
+Mensagem Final
+A eficiência da iluminação não depende apenas da potência ou do fluxo luminoso, mas da engenharia térmica, ótica e construtiva.
+A Linha Flat traduz essa integração entre tecnologia, durabilidade e desempenho visual, garantindo luz com qualidade e longevidade para projetos internos e externos.
+Apostila Técnica — Grau de Proteção em Luminárias
+Compreendendo o Grau de Proteção (IP) e a Importância da Instalação Correta
+________________________________________
+1. Introdução
+A iluminação externa, especialmente voltada à valorização de fachadas e vegetação, exige atenção rigorosa à proteção das luminárias contra agentes externos.
+Como todo equipamento eletrônico, eletricidade e umidade não se combinam — a entrada de água ou partículas pode provocar falhas, curtos-circuitos e redução da vida útil do produto.
+Por isso, compreender o grau de proteção (IP) e aplicar técnicas adequadas de instalação e drenagem é essencial para garantir segurança, desempenho e durabilidade dos sistemas de iluminação.
+________________________________________
+2. O que é Grau de Proteção (IP)
+O grau de proteção IP (Ingress Protection) é uma metodologia de testes normalizada pela norma NBR IEC 60529, que avalia a resistência de um equipamento contra a entrada de partículas sólidas e líquidas.
+Esse índice é representado pela sigla IP, seguida de dois números — por exemplo, IP65 ou IP67 — que indicam os níveis de proteção.
+Significado dos dígitos
+•	Primeiro número: grau de proteção contra poeira e partículas sólidas.
+Quanto maior o número, menores as partículas bloqueadas.
+•	Segundo número: grau de proteção contra entrada de água.
+Quanto maior o número, maior a resistência à umidade, jatos d’água e imersão.
+________________________________________
+3. Exemplos de Classificações Comuns
+Código IP	Proteção contra sólidos	Proteção contra líquidos	Aplicação típica
+IP65	Totalmente protegido contra poeira.	Resiste a jatos d’água sob pressão moderada.	Luminárias externas comuns.
+IP67	Proteção máxima contra poeira.	Suporta imersão temporária em água (até 1 metro por curto período).	Fachadas, jardins e áreas expostas à chuva intensa.
+IP69	Proteção total contra poeira.	Resiste a água sob pressão e temperatura elevadas, inclusive água vaporizada.	Ambientes industriais e galpões de grande porte.
+________________________________________
+4. Testes de Laboratório
+O ensaio de certificação é realizado por laboratórios acreditados, onde as luminárias são submetidas a condições extremas:
+•	Jatos de água sob pressão, simulando chuva forte ou lavagem direta.
+•	Imersão parcial temporária, no caso de produtos IP67.
+•	Vapor e água quente sob pressão, para luminárias IP69.
+A vedação da luminária deve impedir qualquer ingresso de água ou vapor, garantindo integridade total mesmo sob ataques diretos e contínuos.
+________________________________________
+5. Importância da Instalação Correta
+5.1 Drenagem e preparação do solo
+A instalação correta é tão importante quanto a especificação do grau de proteção.
+Em produtos embutidos no solo, é indispensável prever um sistema de drenagem eficiente, evitando o acúmulo de água no alojamento da luminária.
+•	O solo deve ser preparado com camada de brita para facilitar o escoamento.
+•	Antes da instalação definitiva, recomenda-se realizar um teste de drenagem:
+o	Coloque água no nicho e observe o escoamento.
+o	Se a água não for drenada em até 20 minutos, o local não possui drenagem adequada.
+o	Nesse caso, a instalação precisa ser corrigida para evitar falhas futuras.
+5.2 Risco da má instalação
+A ausência de drenagem eficiente pode causar:
+•	Infiltração de água e umidade.
+•	Danos ao circuito eletrônico interno.
+•	Queima prematura da luminária.
+•	Redução da vida útil do produto.
+Esses cuidados são fundamentais especialmente em áreas externas sujeitas a chuva, irrigação, variação térmica e umidade constante do solo.
+________________________________________
+6. Exemplos de Aplicação por Grau de Proteção
+•	IP65: ideal para paredes externas, fachadas e beirais, onde há exposição à chuva e jatos d’água, mas sem imersão.
+•	IP67: indicado para jardins, gramados e áreas de paisagismo, onde pode ocorrer acúmulo momentâneo de água.
+•	IP69: projetado para ambientes industriais e galpões, expostos a alta umidade, vapor e limpeza sob pressão.
+________________________________________
+7. Caso Prático — Teste IP69
+Durante o teste de certificação IP69, observou-se:
+•	Jatos de água sob pressão elevada sendo direcionados à luminária.
+•	Água vaporizada e quente, simulando situações industriais reais.
+•	O produto permaneceu intacto, sem entrada de umidade.
+Esse desempenho é essencial em locais como galpões e armazéns com pé-direito acima de 6 metros, onde são utilizados high bays (Raibês) de alta potência e grande abrangência luminosa.
+________________________________________
+8. Recomendações Gerais
+1.	Sempre verificar o grau IP no catálogo do produto antes da especificação.
+2.	Respeitar as orientações do manual de instalação — especialmente sobre drenagem e vedação.
+3.	Evitar instalar luminárias IP65 diretamente no solo sem sistema de drenagem.
+4.	Realizar o teste de drenagem antes da instalação definitiva.
+5.	Não confundir estanqueidade com imersão permanente: produtos IP67 não substituem equipamentos subaquáticos (IP68).
+6.	Garantir vedação dos conectores e cabos, pois a entrada de água por conexões externas também compromete o sistema.
+________________________________________
+9. Conclusão
+O grau de proteção IP é um dos fatores mais importantes para garantir a segurança e durabilidade das luminárias, especialmente em projetos externos de paisagismo e fachadas.
+Uma instalação com drenagem adequada e vedação eficiente assegura o desempenho ideal e a longevidade do investimento, evitando falhas causadas por infiltração, calor ou má execução.
+Em iluminação externa, tecnologia e cuidado andam juntos.
+A escolha correta do índice IP, aliada à instalação precisa, é o verdadeiro segredo para luz durável, segura e de alto desempenho.
+
+Apostila Técnica — Iluminação em 12 V (Extra-Baixa Tensão)
+Objetivo
+Apresentar, de forma direta e profissional, os fundamentos e vantagens do uso de luminárias alimentadas em 12 volts em projetos de paisagismo, com foco em segurança elétrica e adequação normativa, com base no conteúdo fornecido.
+________________________________________
+Conceito
+As luminárias em 12 V estão “voltando com força máxima” por um motivo central: segurança do usuário. Em ambientes externos — onde circulam pessoas, crianças e animais — a adoção de extra-baixa tensão reduz significativamente o risco de acidentes por choque elétrico em caso de contato acidental.
+________________________________________
+Base normativa
+A NBR 5410 é citada como referência para proteção contra choques elétricos mediante o uso de 12 V.
+Essa solução é especialmente pertinente em áreas molhadas e jardinadas, já que a presença de água pode conduzir eletricidade e aumentar a exposição do usuário (por exemplo, quem circula com o corpo molhado e pisa próximo a luminárias).
+Síntese normativa no contexto apresentado: utilizar 12 V como medida de proteção contra choques, com ênfase em ambientes externos sujeitos à umidade.
+________________________________________
+Benefícios principais
+•	Segurança de pessoas e animais: a extra-baixa tensão agrega proteção adicional em jardins e zonas úmidas.
+•	Mitigação de risco em contato acidental: tensões de rede mais altas aumentam a severidade de um choque; 12 V reduz esse risco.
+•	Aderência ao pedido de mercado: há demanda crescente de especificadores por soluções superiores em 12 V, favorecendo projetos paisagísticos mais seguros.
+________________________________________
+Diretrizes de aplicação
+•	Priorizar 12 V em jardins, áreas molhadas e zonas de circulação externa, onde a combinação água/umidade e contato humano é mais provável.
+•	Considerar 12 V sempre que o objetivo principal incluir proteção adicional contra choque elétrico.
+Observação: o texto ressalta que o corpo humano permite passagem de corrente; por isso, a redução da tensão é estratégica para segurança.
+________________________________________
+Suporte à especificação
+•	Caso determinada informação ou recurso não seja facilmente localizado no catálogo, recomenda-se contatar a equipe comercial/técnica.
+•	Há retaguarda dedicada para personalizar ou direcionar soluções em conformidade com as necessidades do projeto, inclusive em 12 V.
+________________________________________
+Conclusão
+Luminárias em 12 volts constituem uma medida efetiva de segurança em paisagismo, com amparo na NBR 5410 conforme apresentado, e resposta direta à demanda dos especificadores. Em contextos externos — sobretudo úmidos e jardinados — adotar 12 V eleva o nível de proteção ao usuário, mantendo a qualidade do projeto e facilitando a conformidade técnica.
+
+Linha FLAT IN: 
+Embutir em piso ou solo para iluminação de:
+- fachadas
+- colunas
+- monumentos
+- arvores de todas as espécies
+- vegetações
+- muros
+
+Linha FLAT OUT: 
+Projetor de sobrepor para iluminação de: 
+- fachadas
+- colunas
+- monumentos
+- arvores de todas as espécies
+- vegetações
+- muros 
+
+
+Linha NUDE:
+Embutido ou de sobrepor (se utilizar com acessórios), para iluminação de:
+- fachadas
+- colunas
+- monumentos
+- arvores de todas as espécies
+- vegetações
+- muros
+
+Linha COIN:
+Balizador para embutir em pisos, decks, escadas, muros ou paredes, para balizar caminhos
+
+Regras:
+
+- não falar de outras marcas. Falar apenas dos produtos e processos produtivos da marca INTERLIGHT.
+
+- Caso o cliente fale mal de outras empresas ou produtos não comentar. Manter postura ética e focar sempre nos produtos da Interlight
+
+- não fazer desenhos técnicos (projetos), mesmo que o cliente solicite. Caso o cliente solicite, orientar a falar com um consultor técnico da Interlight para receber as orientações.
+
+- não temos luminárias para uso submerso 
+
+- Sempre reforçar quando possível, que a INTERLIGHT é uma industrial 100% nacional e que oferece 5 anos de garantia 
+- Fator de segurança é sempre prioridade.
+
+- Caso o cliente pergunte onde pode comprar os produtos direciona-lo a falar com um consultor comercial da Interlight
+
+

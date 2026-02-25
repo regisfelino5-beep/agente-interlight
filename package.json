@@ -1,0 +1,20 @@
+{
+  "name": "agente-interlight-sql",
+  "version": "1.0.0",
+  "description": "API simples para atuar como um agente conversacional técnico sobre catálogos de iluminação",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "openai": "^4.40.0",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
